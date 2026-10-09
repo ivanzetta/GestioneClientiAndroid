@@ -20,6 +20,10 @@ import java.util.Locale
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.Drawable
+import android.graphics.Canvas
+import android.graphics.Paint
+import java.security.MessageDigest
 
 class MainActivity: Activity() {
  private val prefs by lazy { getSharedPreferences("gestione_clienti_options", Context.MODE_PRIVATE) }
@@ -28,6 +32,26 @@ class MainActivity: Activity() {
  private var unlocked=false
  private var prompting=false
  private var hasStarted=false
+ private var activationDialogShowing=false
+ private val activationHash="676dd0aa983bd7d0d99e4cb2fc0c927a9680ce6bd2c25b247635afe8b6286638"
+ private fun isActivated()=prefs.getBoolean("yellowkunde_activated",false)
+ private fun checkActivation() {
+  if (isActivated()) { authenticate(); return }
+  if (activationDialogShowing || isFinishing) return
+  activationDialogShowing=true
+  val field=EditText(this).apply { hint="Codice di attivazione";setSingleLine(true);inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD;setPadding(dp(16),dp(12),dp(16),dp(12)) }
+  val box=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL;setPadding(dp(16),dp(8),dp(16),0);addView(field) }
+  val dialog=AlertDialog.Builder(this).setTitle("Attiva YellowKunde").setMessage("Inserisci il codice condiviso per attivare l’app offline.").setView(box).setPositiveButton("Attiva",null).setNegativeButton("Esci"){_,_->finish()}.setCancelable(false).create()
+  dialog.setOnShowListener {
+   dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+    val digest=MessageDigest.getInstance("SHA-256").digest(field.text.toString().toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+    if (MessageDigest.isEqual(digest.toByteArray(),activationHash.toByteArray())) {
+     prefs.edit().putBoolean("yellowkunde_activated",true).apply();activationDialogShowing=false;dialog.dismiss();authenticate()
+    } else field.error="Codice non corretto"
+   }
+  }
+  dialog.show()
+ }
  private var listSearch=""
  private var listZone=""
  private var listScrollY=0
@@ -46,7 +70,7 @@ class MainActivity: Activity() {
  private val restoreRequest=104
  private var backupPassword:CharArray?=null
  private lateinit var root:LinearLayout
- override fun onCreate(savedInstanceState:Bundle?) { super.onCreate(savedInstanceState); db=Database(this); authenticate() }
+ override fun onCreate(savedInstanceState:Bundle?) { super.onCreate(savedInstanceState); db=Database(this); checkActivation() }
  private fun authenticate() {
   if (unlocked || prompting) return
   val km=getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
@@ -63,7 +87,7 @@ class MainActivity: Activity() {
   }
   prompting=true
   val prompt=BiometricPrompt.Builder(this)
-   .setTitle(tr("Sblocca Gestione Clienti"))
+   .setTitle(tr("Sblocca YellowKunde"))
    .setSubtitle(tr("Usa impronta digitale o PIN del telefono"))
    .setAllowedAuthenticators(android.hardware.biometrics.BiometricManager.Authenticators.BIOMETRIC_STRONG or android.hardware.biometrics.BiometricManager.Authenticators.DEVICE_CREDENTIAL)
    .build()
@@ -77,7 +101,7 @@ class MainActivity: Activity() {
   })
  }
  override fun onStop() { super.onStop(); unlocked=false; prompting=false }
- override fun onStart() { super.onStart(); if (hasStarted && ::db.isInitialized && !unlocked) authenticate(); hasStarted=true }
+ override fun onStart() { super.onStart(); if (hasStarted && ::db.isInitialized && !unlocked) checkActivation(); hasStarted=true }
  private val brandYellow=Color.rgb(250,179,0)
  private val ink=Color.rgb(34,34,34)
  private fun dp(n:Int):Int=(n*resources.displayMetrics.density).toInt()
@@ -91,10 +115,34 @@ class MainActivity: Activity() {
   params.setMargins(0,dp(5),0,dp(5));layoutParams=params
   setOnClickListener{action()}
  }
- private fun iconButton(symbol:String, description:String, action:()->Unit):TextView = TextView(this).apply {
-  text=symbol;contentDescription=tr(description);textSize=21f;gravity=android.view.Gravity.CENTER
-  setTextColor(ink);background=shape(brandYellow)
+ private fun iconButton(symbol:String, description:String, action:()->Unit):ImageButton = ImageButton(this).apply {
+  val icon = when(symbol) {
+   "☎" -> R.drawable.ic_action_phone
+   "✉" -> R.drawable.ic_action_mail
+   "➤" -> R.drawable.ic_action_navigation
+   "↗" -> R.drawable.ic_action_share
+   "▦" -> R.drawable.ic_action_calendar
+   else -> R.drawable.ic_action_share
+  }
+  setImageResource(icon)
+  scaleType=android.widget.ImageView.ScaleType.CENTER_INSIDE
+  contentDescription=tr(description)
+  background=shape(brandYellow)
+  setPadding(dp(11),dp(11),dp(11),dp(11))
   layoutParams=LinearLayout.LayoutParams(dp(44),dp(44)).apply { marginEnd=dp(7) }
+  setOnClickListener { action() }
+ }
+ private fun compactAction(icon:Int,description:String,action:()->Unit):ImageButton = ImageButton(this).apply {
+  setImageResource(icon);contentDescription=tr(description)
+  scaleType=android.widget.ImageView.ScaleType.CENTER_INSIDE
+  background=shape(brandYellow);setPadding(dp(12),dp(12),dp(12),dp(12))
+  layoutParams=LinearLayout.LayoutParams(dp(48),dp(48)).apply { marginEnd=dp(4) }
+  setOnClickListener { action() }
+ }
+ private fun compactTextAction(symbol:String,description:String,action:()->Unit):TextView = TextView(this).apply {
+  text=symbol;textSize=19f;gravity=android.view.Gravity.CENTER;setTextColor(ink)
+  contentDescription=tr(description);background=shape(brandYellow)
+  layoutParams=LinearLayout.LayoutParams(dp(48),dp(48)).apply { marginEnd=dp(4) }
   setOnClickListener { action() }
  }
  private fun contactRow(label:String,value:String,symbol:String,action:()->Unit) {
@@ -116,17 +164,31 @@ class MainActivity: Activity() {
  private val sortKeys=listOf("name","code","city","zone","sector","visit","count")
  private fun showList(q:String=listSearch) {
   listSearch=q
-  screen(tr("Gestione Clienti"))
+  screen("YellowKunde")
   val scroll=root.parent as ScrollView
-  root.addView(button("＋ " + tr("Nuovo cliente")){saveListPosition(scroll);edit(null)})
-  root.addView(secondaryButton("⚙ " + tr("Opzioni")){saveListPosition(scroll);showOptions()})
-  val search=EditText(this).apply{hint=tr("Cerca codice, nome, città, settore, zona");setSingleLine(true);setText(q)}
-  root.addView(search)
+  lateinit var searchBar:LinearLayout
+  lateinit var sortAction:()->Unit
+  val toolbar=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
+  toolbar.addView(compactTextAction("＋","Nuovo cliente") { saveListPosition(scroll);edit(null) })
+  toolbar.addView(compactTextAction("☷","Filtri") { searchBar.visibility=if(searchBar.visibility==android.view.View.VISIBLE) android.view.View.GONE else android.view.View.VISIBLE })
+  toolbar.addView(compactTextAction("↕","Ordina clienti") { sortAction() })
+  toolbar.addView(compactTextAction("⚙","Opzioni") { saveListPosition(scroll);showOptions() })
+  root.addView(toolbar)
+  searchBar=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
+  val search=EditText(this).apply{hint=tr("Cerca codice, nome, città, settore, zona");setSingleLine(true);setText(q);textSize=14f}
+  searchBar.addView(search)
   val zoneOptions=listOf("") + db.zones()
-  val zoneSpinner=Spinner(this)
+  val zoneSpinner=Spinner(this).apply { contentDescription=tr("Filtra per zona") }
   zoneSpinner.adapter=ArrayAdapter(this,android.R.layout.simple_spinner_dropdown_item,zoneOptions.map { if(it.isBlank()) tr("Tutte le zone") else it })
-  root.addView(TextView(this).apply { text=tr("Filtra per zona");textSize=15f })
-  root.addView(zoneSpinner)
+  val filterRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
+  filterRow.addView(TextView(this).apply { text=tr("Zona");textSize=13f;setTextColor(ink) })
+  filterRow.addView(zoneSpinner,LinearLayout.LayoutParams(0,dp(48),1f))
+  filterRow.addView(compactTextAction("×","Azzera filtri") {
+   listSearch="";listZone="";listScrollY=0
+   prefs.edit().putString("sort_key","name").putBoolean("sort_desc",false).apply();showList("")
+  })
+  searchBar.addView(filterRow)
+  root.addView(searchBar)
   val zoneIndex=zoneOptions.indexOf(listZone).coerceAtLeast(0)
   if(zoneIndex==0) listZone=""
   zoneSpinner.setSelection(zoneIndex)
@@ -141,7 +203,7 @@ class MainActivity: Activity() {
     }
    }
   }
-  val sortButton=secondaryButton("↕ " + tr("Ordina clienti")){
+  sortAction={
    val current=prefs.getString("sort_key","name") ?: "name"
    val selected=sortKeys.indexOf(current).coerceAtLeast(0)
    val choices=sortLabels.map{tr(it)}.toTypedArray()
@@ -156,12 +218,8 @@ class MainActivity: Activity() {
       }.setNegativeButton(tr("Annulla"),null).show()
     }.setNegativeButton(tr("Annulla"),null).show()
   }
-  root.addView(sortButton,root.indexOfChild(list))
-  root.addView(secondaryButton(tr("Azzera filtri")) {
-   listSearch="";listZone="";listScrollY=0
-   prefs.edit().putString("sort_key","name").putBoolean("sort_desc",false).apply()
-   showList("")
-  },root.indexOfChild(list))
+
+
   search.addTextChangedListener(object:android.text.TextWatcher{
    override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){}
    override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){listSearch=s.toString();listScrollY=0;update()}
@@ -244,7 +302,7 @@ class MainActivity: Activity() {
   root.addView(button("← " + tr("Indietro")){showOptions()})
   val packageInfo=packageManager.getPackageInfo(packageName,0)
   root.addView(TextView(this).apply {
-   text="Gestione Clienti\n${tr("Versione")}: ${packageInfo.versionName}"
+   text="YellowKunde\n${tr("Versione")}: ${packageInfo.versionName}"
    textSize=18f
   })
  }
@@ -297,18 +355,26 @@ class MainActivity: Activity() {
    startActivity(Intent.createChooser(share,tr("Condividi cliente")))
   })
   actionRow.addView(iconButton("▦","Appuntamento Outlook") {
-   val intent=Intent(Intent.ACTION_INSERT).apply {
-    data=CalendarContract.Events.CONTENT_URI
-    putExtra(CalendarContract.Events.TITLE,"Visita – "+customer["nome"].orEmpty())
-    putExtra(CalendarContract.Events.EVENT_LOCATION,destination)
-    putExtra(CalendarContract.Events.DESCRIPTION,"Cliente: "+customer["nome"].orEmpty()+"\n"+customer["telefono_principale"].orEmpty())
-   }
-   val outlook=Intent(intent).setPackage("com.microsoft.office.outlook")
-   if(outlook.resolveActivity(packageManager)!=null) openExternal(outlook)
-   else if(intent.resolveActivity(packageManager)!=null) {
-    Toast.makeText(this,tr("Outlook non supporta questa apertura: scegli un calendario"),Toast.LENGTH_LONG).show()
-    openExternal(intent)
-   } else Toast.makeText(this,tr("Nessuna app calendario compatibile"),Toast.LENGTH_LONG).show()
+   // Outlook Android does not reliably implement CalendarContract event insertion.
+   // Open the Outlook calendar compose page, allowing the user to choose the account type.
+   val subject="Visita – "+customer["nome"].orEmpty()
+   val description="Cliente: "+customer["nome"].orEmpty()+"\nTelefono: "+customer["telefono_principale"].orEmpty()
+   val options=if(isGerman()) arrayOf("Geschäfts- oder Schulkonto", "Privates Outlook-Konto")
+               else arrayOf("Account aziendale o scolastico", "Account Outlook personale")
+   AlertDialog.Builder(this)
+    .setTitle(tr("Appuntamento Outlook"))
+    .setItems(options) { _,which ->
+     val base=if(which==0) "https://outlook.office.com/calendar/deeplink/compose"
+              else "https://outlook.live.com/calendar/0/deeplink/compose"
+     val url=Uri.parse(base).buildUpon()
+      .appendQueryParameter("subject",subject)
+      .appendQueryParameter("location",destination)
+      .appendQueryParameter("body",description)
+      .build()
+     openExternal(Intent(Intent.ACTION_VIEW,url))
+    }
+    .setNegativeButton(tr("Annulla"),null)
+    .show()
   })
   val (count,last)=db.stats(code)
   val visits=db.visitEntries(code)

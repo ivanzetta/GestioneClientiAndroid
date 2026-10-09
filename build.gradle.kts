@@ -1,5 +1,6 @@
-plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
-android { namespace = "it.gestioneclienti"; compileSdk = 35
- defaultConfig { applicationId = "it.gestioneclienti"; minSdk = 26; targetSdk = 35; versionCode = 5; versionName = "0.5" } }
 
- dependencies { implementation("org.apache.poi:poi-ooxml:5.2.5") }
+plugins {
+    id("com.android.application") version "8.5.2" apply false
+    id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+    id("org.jetbrains.kotlin.kapt") version "1.9.24" apply false
+}

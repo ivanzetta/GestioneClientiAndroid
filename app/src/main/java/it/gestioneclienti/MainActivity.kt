@@ -12,8 +12,14 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.ViewGroup
 import android.widget.*
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 
 class MainActivity: Activity() {
+ private val prefs by lazy { getSharedPreferences("gestione_clienti_options", Context.MODE_PRIVATE) }
+ private fun tr(it:String):String = if(prefs.getString("language", "it") == "de") translations[it] ?: it else it
+ private fun isGerman() = prefs.getString("language", "it") == "de"
  private var unlocked=false
  private var prompting=false
  private var hasStarted=false
@@ -29,20 +35,20 @@ class MainActivity: Activity() {
   if (unlocked || prompting) return
   val km=getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
   if (!km.isDeviceSecure) {
-   AlertDialog.Builder(this).setTitle("Protezione richiesta")
-    .setMessage("Configura un PIN e, se desideri, l’impronta digitale nelle impostazioni di Android prima di usare l’app.")
-    .setPositiveButton("Chiudi") { _,_ -> finish() }.setCancelable(false).show()
+   AlertDialog.Builder(this).setTitle(tr("Protezione richiesta"))
+    .setMessage(tr("Configura un PIN e, se desideri, l’impronta digitale nelle impostazioni di Android prima di usare l’app."))
+    .setPositiveButton(tr("Chiudi")) { _,_ -> finish() }.setCancelable(false).show()
    return
   }
   if (android.os.Build.VERSION.SDK_INT < 30) {
-   AlertDialog.Builder(this).setMessage("Questa versione richiede Android 11 o successivo per l’accesso protetto.")
-    .setPositiveButton("Chiudi") { _,_ -> finish() }.setCancelable(false).show()
+   AlertDialog.Builder(this).setMessage(tr("Questa versione richiede Android 11 o successivo per l’accesso protetto."))
+    .setPositiveButton(tr("Chiudi")) { _,_ -> finish() }.setCancelable(false).show()
    return
   }
   prompting=true
   val prompt=BiometricPrompt.Builder(this)
-   .setTitle("Sblocca Gestione Clienti")
-   .setSubtitle("Usa impronta digitale o PIN del telefono")
+   .setTitle(tr("Sblocca Gestione Clienti"))
+   .setSubtitle(tr("Usa impronta digitale o PIN del telefono"))
    .setAllowedAuthenticators(android.hardware.biometrics.BiometricManager.Authenticators.BIOMETRIC_STRONG or android.hardware.biometrics.BiometricManager.Authenticators.DEVICE_CREDENTIAL)
    .build()
   prompt.authenticate(CancellationSignal(), mainExecutor, object:BiometricPrompt.AuthenticationCallback() {
@@ -56,91 +62,174 @@ class MainActivity: Activity() {
  }
  override fun onStop() { super.onStop(); unlocked=false; prompting=false }
  override fun onStart() { super.onStart(); if (hasStarted && ::db.isInitialized && !unlocked) authenticate(); hasStarted=true }
- private fun button(label:String, action:()->Unit):Button = Button(this).apply{text=label;setOnClickListener{action()}}
+ private val brandYellow=Color.rgb(250,179,0)
+ private val ink=Color.rgb(34,34,34)
+ private fun dp(n:Int):Int=(n*resources.displayMetrics.density).toInt()
+ private fun shape(color:Int,stroke:Int?=null):GradientDrawable=GradientDrawable().apply {
+  setColor(color);cornerRadius=dp(14).toFloat();if(stroke!=null)setStroke(dp(1),stroke)
+ }
+ private fun button(label:String, action:()->Unit):Button = Button(this).apply {
+  text=label;isAllCaps=false;textSize=16f;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD
+  background=shape(brandYellow);minHeight=dp(50);setPadding(dp(14),dp(9),dp(14),dp(9))
+  val params=LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT)
+  params.setMargins(0,dp(5),0,dp(5));layoutParams=params
+  setOnClickListener{action()}
+ }
+ private fun secondaryButton(label:String, action:()->Unit):Button=button(label,action).apply {
+  background=shape(Color.WHITE,Color.rgb(223,199,137))
+ }
  private fun screen(title:String):LinearLayout {
-  root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(20,25,20,15)}
+  root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(18),dp(22),dp(18),dp(20));setBackgroundColor(Color.rgb(249,249,247))}
   val scroll=ScrollView(this);scroll.addView(root);setContentView(scroll)
-  root.addView(TextView(this).apply{text=title;textSize=25f;setPadding(0,0,0,20)})
+  root.addView(TextView(this).apply{text=title;textSize=25f;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;setPadding(0,0,0,dp(18))})
   return root
  }
+ private val sortLabels=listOf("Nome cliente","Codice cliente","Città","Zona","Settore","Data ultima visita","Numero visite annuali")
+ private val sortKeys=listOf("name","code","city","zone","sector","visit","count")
  private fun showList(q:String="") {
-  screen("Gestione Clienti")
-  root.addView(button("+ Nuovo cliente"){edit(null)})
-  root.addView(button("Importa Excel .xlsx") {
+  screen(tr("Gestione Clienti"))
+  root.addView(button("＋ " + tr("Nuovo cliente")){edit(null)})
+  root.addView(secondaryButton("⚙ " + tr("Opzioni")){showOptions()})
+  val search=EditText(this).apply{hint=tr("Cerca codice, nome, città, settore, zona");setSingleLine(true);setText(q)}
+  root.addView(search)
+  val list=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};root.addView(list)
+  fun update(text:String){
+   list.removeAllViews()
+   val sort=prefs.getString("sort_key","name") ?: "name"
+   val descending=prefs.getBoolean("sort_desc",false)
+   db.sortedList(text,sort,descending).forEach{(code,name)->list.addView(secondaryButton("$name  ·  $code"){detail(code)})}
+  }
+  val sortButton=secondaryButton("↕ " + tr("Ordina clienti")){ 
+   val current=prefs.getString("sort_key","name") ?: "name"
+   val selected=sortKeys.indexOf(current).coerceAtLeast(0)
+   val choices=sortLabels.map{tr(it)}.toTypedArray()
+   AlertDialog.Builder(this).setTitle(tr("Ordina per"))
+    .setSingleChoiceItems(choices,selected){dialog,which->
+     dialog.dismiss()
+     val directions=arrayOf(tr("Crescente"),tr("Decrescente"))
+     AlertDialog.Builder(this).setTitle(tr("Direzione"))
+      .setSingleChoiceItems(directions,if(prefs.getBoolean("sort_desc",false))1 else 0){d,choice->
+       prefs.edit().putString("sort_key",sortKeys[which]).putBoolean("sort_desc",choice==1).apply()
+       d.dismiss();showList(search.text.toString())
+      }.setNegativeButton(tr("Annulla"),null).show()
+    }.setNegativeButton(tr("Annulla"),null).show()
+  }
+  root.addView(sortButton,root.indexOfChild(list))
+  search.addTextChangedListener(object:android.text.TextWatcher{override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){};override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){update(s.toString())};override fun afterTextChanged(s:android.text.Editable?) {}})
+  update(q)
+ }
+
+ private fun heading(label:String) {
+  root.addView(TextView(this).apply { text=label; textSize=19f; setPadding(0,22,0,8) })
+ }
+ private fun showOptions() {
+  screen(tr("Opzioni"))
+  root.addView(button("← " + tr("Indietro")){showList()})
+  heading(tr("Importazione ed esportazione Excel"))
+  root.addView(button(tr("Importa Excel .xlsx")) {
    startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply { type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";addCategory(Intent.CATEGORY_OPENABLE) },importRequest)
   })
-  root.addView(button("Esporta Excel .xlsx") {
-   AlertDialog.Builder(this).setTitle("Attenzione ai dati personali")
-    .setMessage("Il file Excel non è cifrato e contiene dati dei clienti. Conservalo in una posizione protetta e non condividerlo senza autorizzazione.")
-    .setNegativeButton("Annulla", null)
-    .setPositiveButton("Continua") { _, _ ->
+  root.addView(button(tr("Esporta Excel .xlsx")) {
+   AlertDialog.Builder(this).setTitle(tr("Attenzione ai dati personali"))
+    .setMessage(tr("Il file Excel non è cifrato e contiene dati dei clienti. Conservalo in una posizione protetta e non condividerlo senza autorizzazione."))
+    .setNegativeButton(tr("Annulla"), null)
+    .setPositiveButton(tr("Continua")) { _, _ ->
      startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply { type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";putExtra(Intent.EXTRA_TITLE,"clienti.xlsx");addCategory(Intent.CATEGORY_OPENABLE) },exportRequest)
     }.show()
   })
-  root.addView(button("Crea backup cifrato") {
-   askBackupPassword("Password per il backup (minimo 12 caratteri)") { password ->
+  heading(tr("Backup e ripristino"))
+  root.addView(button(tr("Crea backup cifrato")) {
+   askBackupPassword(tr("Password per il backup (minimo 12 caratteri)")) { password ->
     backupPassword=password
     startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply { type="application/octet-stream";putExtra(Intent.EXTRA_TITLE,"clienti.gcbk");addCategory(Intent.CATEGORY_OPENABLE) },backupRequest)
    }
   })
-  root.addView(button("Ripristina backup cifrato") {
-   AlertDialog.Builder(this).setTitle("Ripristino completo")
-    .setMessage("Il ripristino SOSTITUIRÀ tutti i clienti e tutte le visite presenti. Assicurati di avere una copia di sicurezza.")
-    .setNegativeButton("Annulla",null).setPositiveButton("Continua") { _,_ ->
-     askBackupPassword("Password del backup") { password ->
+  root.addView(button(tr("Ripristina backup cifrato")) {
+   AlertDialog.Builder(this).setTitle(tr("Ripristino completo"))
+    .setMessage(tr("Il ripristino SOSTITUIRÀ tutti i clienti e tutte le visite presenti. Assicurati di avere una copia di sicurezza."))
+    .setNegativeButton(tr("Annulla"),null).setPositiveButton(tr("Continua")) { _,_ ->
+     askBackupPassword(tr("Password del backup")) { password ->
       backupPassword=password
       startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply { type="application/octet-stream";addCategory(Intent.CATEGORY_OPENABLE) },restoreRequest)
      }
     }.show()
   })
-  val search=EditText(this).apply{hint="Cerca codice, nome, città, settore, zona";setSingleLine(true);setText(q)}
-  root.addView(search)
-  val list=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};root.addView(list)
-  fun update(text:String){list.removeAllViews();db.list(text).forEach{(code,name)->list.addView(button("$name  ·  $code"){detail(code)})}}
-  search.addTextChangedListener(object:android.text.TextWatcher{override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){};override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){update(s.toString())};override fun afterTextChanged(s:android.text.Editable?) {}})
-  update(q)
+
+  heading(tr("Sicurezza"))
+  root.addView(button(tr("Sicurezza")){showSecurity()})
+  heading(tr("Lingua"))
+  root.addView(button(tr("Lingua") + " / Sprache"){chooseLanguage()})
+  heading(tr("Informazioni sull’app"))
+  root.addView(button(tr("Informazioni sull’app")){showAbout()})
+ }
+ private fun showSecurity() {
+  screen(tr("Sicurezza"))
+  root.addView(button("← " + tr("Indietro")){showOptions()})
+  root.addView(TextView(this).apply {
+   text=tr("Accesso protetto con impronta digitale o PIN del dispositivo.") + "\n\n" + tr("La protezione è obbligatoria e non può essere disattivata da questa schermata.")
+   textSize=17f
+  })
+ }
+ private fun chooseLanguage() {
+  val choices=arrayOf("Italiano", "Deutsch")
+  AlertDialog.Builder(this).setTitle(tr("Scegli la lingua dell’app"))
+   .setSingleChoiceItems(choices,if(isGerman()) 1 else 0){ dialog,which ->
+    prefs.edit().putString("language",if(which==1) "de" else "it").apply()
+    dialog.dismiss()
+    showOptions()
+    Toast.makeText(this,tr("Lingua aggiornata"),Toast.LENGTH_SHORT).show()
+   }.setNegativeButton(tr("Annulla"),null).show()
+ }
+ private fun showAbout() {
+  screen(tr("Informazioni sull’app"))
+  root.addView(button("← " + tr("Indietro")){showOptions()})
+  val packageInfo=packageManager.getPackageInfo(packageName,0)
+  root.addView(TextView(this).apply {
+   text="Gestione Clienti\n${tr("Versione")}: ${packageInfo.versionName}"
+   textSize=18f
+  })
  }
  private fun edit(code:String?) {
   val existing=code?.let{db.get(it)} ?: emptyMap()
-  screen(if(code==null)"Nuovo cliente" else "Modifica cliente")
+  screen(if(code==null)tr("Nuovo cliente") else tr("Modifica cliente"))
   val inputs=mutableMapOf<String,EditText>()
   fields.forEachIndexed{index,key->
-   root.addView(TextView(this).apply{text=captions[index]})
+   root.addView(TextView(this).apply{text=tr(captions[index])})
    val field=EditText(this).apply{setText(existing[key] ?: "");setSingleLine(key!="note");if(key=="note")minLines=3; if(key.startsWith("telefono"))inputType=InputType.TYPE_CLASS_PHONE}
    inputs[key]=field;root.addView(field)
   }
-  root.addView(button("Salva"){
+  root.addView(button(tr("Salva")){
    try {db.save(code,inputs.mapValues{it.value.text.toString()});detail(inputs.getValue("codice").text.toString().trim())}
-   catch(e:Exception){Toast.makeText(this,e.message ?: "Errore",Toast.LENGTH_LONG).show()}
+   catch(e:Exception){Toast.makeText(this,e.message ?: tr("Errore"),Toast.LENGTH_LONG).show()}
   })
-  root.addView(button("Annulla"){if(code==null)showList() else detail(code)})
+  root.addView(button(tr("Annulla")){if(code==null)showList() else detail(code)})
  }
  private fun detail(code:String) {
   val customer=db.get(code) ?: run{showList();return}
   screen(customer["nome"].orEmpty())
-  root.addView(button("← Elenco clienti"){showList()})
-  fields.forEachIndexed{index,key->root.addView(TextView(this).apply{text="${captions[index]}: ${customer[key].orEmpty()}";textSize=16f;setPadding(0,5,0,5)})}
+  root.addView(button(tr("← Elenco clienti")){showList()})
+  fields.forEachIndexed{index,key->root.addView(TextView(this).apply{text="${tr(captions[index])}: ${customer[key].orEmpty()}";textSize=16f;setPadding(0,5,0,5)})}
   val (count,last)=db.stats(code)
-  root.addView(TextView(this).apply{text="Visite ${java.time.LocalDate.now().year}: $count\nUltima visita: $last\n\nStorico:\n${db.history(code)}";textSize=17f;setPadding(0,15,0,15)})
-  root.addView(button("Registra visita (oggi)"){db.visit(code);detail(code)})
-  root.addView(button("Registra visita con altra data") {
-   val input=EditText(this).apply { hint="AAAA-MM-GG";setText(java.time.LocalDate.now().toString());setSingleLine(true) }
-   AlertDialog.Builder(this).setTitle("Data della visita").setView(input)
-    .setNegativeButton("Annulla",null).setPositiveButton("Registra") { _,_ ->
+  root.addView(TextView(this).apply{text=if(isGerman()) "Besuche ${java.time.LocalDate.now().year}: $count\nLetzter Besuch: $last\n\nVerlauf:\n${db.history(code)}" else "Visite ${java.time.LocalDate.now().year}: $count\nUltima visita: $last\n\nStorico:\n${db.history(code)}";textSize=17f;setPadding(0,15,0,15)})
+  root.addView(button(tr("Registra visita (oggi)")){db.visit(code);detail(code)})
+  root.addView(button(tr("Registra visita con altra data")) {
+   val input=EditText(this).apply { hint=tr("AAAA-MM-GG");setText(java.time.LocalDate.now().toString());setSingleLine(true) }
+   AlertDialog.Builder(this).setTitle(tr("Data della visita")).setView(input)
+    .setNegativeButton(tr("Annulla"),null).setPositiveButton(tr("Registra")) { _,_ ->
      try { db.visit(code,java.time.LocalDate.parse(input.text.toString().trim()));detail(code) }
-     catch(e:Exception) { Toast.makeText(this,"Data non valida. Usa AAAA-MM-GG",Toast.LENGTH_LONG).show() }
+     catch(e:Exception) { Toast.makeText(this,tr("Data non valida. Usa AAAA-MM-GG"),Toast.LENGTH_LONG).show() }
     }.show()
   })
-  root.addView(button("Annulla ultima visita") {AlertDialog.Builder(this).setMessage("Eliminare l'ultima visita registrata?").setPositiveButton("Sì"){_,_->db.undoLastVisit(code);detail(code)}.setNegativeButton("No",null).show()})
-  root.addView(button("Modifica cliente"){edit(code)})
-  root.addView(button("Elimina cliente") {AlertDialog.Builder(this).setMessage("Eliminare definitivamente questo cliente e tutte le visite?").setPositiveButton("Elimina"){_,_->db.delete(code);showList()}.setNegativeButton("Annulla",null).show()})
+  root.addView(button(tr("Annulla ultima visita")) {AlertDialog.Builder(this).setMessage(tr("Eliminare l'ultima visita registrata?")).setPositiveButton(tr("Sì")){_,_->db.undoLastVisit(code);detail(code)}.setNegativeButton(tr("No"),null).show()})
+  root.addView(button(tr("Modifica cliente")){edit(code)})
+  root.addView(button(tr("Elimina cliente")) {AlertDialog.Builder(this).setMessage(tr("Eliminare definitivamente questo cliente e tutte le visite?")).setPositiveButton(tr("Elimina")){_,_->db.delete(code);showList()}.setNegativeButton(tr("Annulla"),null).show()})
  }
  private fun askBackupPassword(title:String, action:(CharArray)->Unit) {
   val input=EditText(this).apply { inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD }
   AlertDialog.Builder(this).setTitle(title).setView(input)
-   .setNegativeButton("Annulla",null).setPositiveButton("Continua") { _,_ ->
+   .setNegativeButton(tr("Annulla"),null).setPositiveButton(tr("Continua")) { _,_ ->
     val password=input.text.toString().toCharArray()
-    if(password.isEmpty()) Toast.makeText(this,"Inserisci una password",Toast.LENGTH_LONG).show()
+    if(password.isEmpty()) Toast.makeText(this,tr("Inserisci una password"),Toast.LENGTH_LONG).show()
     else action(password)
    }.show()
  }
@@ -153,19 +242,19 @@ class MainActivity: Activity() {
    when(requestCode) {
     importRequest -> {
      val preview=Excel.read(this,uri,db)
-     AlertDialog.Builder(this).setTitle("Anteprima importazione")
-      .setMessage("Nuovi clienti: ${preview.newCount}\nDa aggiornare: ${preview.updateCount}\nTotale: ${preview.rows.size}\n\nLe visite già registrate saranno conservate.")
-      .setNegativeButton("Annulla",null)
-      .setPositiveButton("Conferma") { _,_ ->
-       try { db.importCustomers(preview.rows);showList();Toast.makeText(this,"Importazione completata",Toast.LENGTH_LONG).show() }
-       catch(e:Exception) { Toast.makeText(this,e.message ?: "Errore importazione",Toast.LENGTH_LONG).show() }
+     AlertDialog.Builder(this).setTitle(tr("Anteprima importazione"))
+      .setMessage(if(isGerman()) "Neue Kunden: ${preview.newCount}\nZu aktualisieren: ${preview.updateCount}\nGesamt: ${preview.rows.size}\n\nBereits erfasste Besuche bleiben erhalten." else "Nuovi clienti: ${preview.newCount}\nDa aggiornare: ${preview.updateCount}\nTotale: ${preview.rows.size}\n\nLe visite già registrate saranno conservate.")
+      .setNegativeButton(tr("Annulla"),null)
+      .setPositiveButton(tr("Conferma")) { _,_ ->
+       try { db.importCustomers(preview.rows);showList();Toast.makeText(this,tr("Importazione completata"),Toast.LENGTH_LONG).show() }
+       catch(e:Exception) { Toast.makeText(this,e.message ?: tr("Errore importazione"),Toast.LENGTH_LONG).show() }
       }.show()
     }
-    exportRequest -> { Excel.write(this,uri,db);Toast.makeText(this,"Esportazione completata",Toast.LENGTH_LONG).show() }
-    backupRequest -> { SecureBackup.save(this,uri,db,backupPassword ?: error("Password mancante"));Toast.makeText(this,"Backup cifrato creato",Toast.LENGTH_LONG).show() }
-    restoreRequest -> { val (customers,visits)=SecureBackup.restore(this,uri,db,backupPassword ?: error("Password mancante"));showList();Toast.makeText(this,"Ripristinati $customers clienti e $visits visite",Toast.LENGTH_LONG).show() }
+    exportRequest -> { Excel.write(this,uri,db);Toast.makeText(this,tr("Esportazione completata"),Toast.LENGTH_LONG).show() }
+    backupRequest -> { SecureBackup.save(this,uri,db,backupPassword ?: error("Password mancante"));Toast.makeText(this,tr("Backup cifrato creato"),Toast.LENGTH_LONG).show() }
+    restoreRequest -> { val (customers,visits)=SecureBackup.restore(this,uri,db,backupPassword ?: error("Password mancante"));showList();Toast.makeText(this,if(isGerman()) "$customers Kunden und $visits Besuche wiederhergestellt" else "Ripristinati $customers clienti e $visits visite",Toast.LENGTH_LONG).show() }
    }
-  } catch(e:Exception) { AlertDialog.Builder(this).setTitle("Operazione non riuscita").setMessage(e.message ?: "Password errata o file non valido").setPositiveButton("OK",null).show() }
+  } catch(e:Exception) { AlertDialog.Builder(this).setTitle(tr("Operazione non riuscita")).setMessage(e.message ?: tr("Password errata o file non valido")).setPositiveButton("OK",null).show() }
   finally { backupPassword?.fill('\u0000');backupPassword=null }
  }
 

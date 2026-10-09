@@ -21,6 +21,17 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
   readableDatabase.rawQuery("SELECT codice,nome FROM clienti WHERE codice LIKE ? OR nome LIKE ? OR citta LIKE ? OR settore LIKE ? OR zona LIKE ? ORDER BY nome COLLATE NOCASE", Array(5){pattern}).use { c -> while(c.moveToNext()) result.add(c.getString(0) to c.getString(1)) }
   return result
  }
+ fun sortedList(q:String, sort:String, descending:Boolean):List<Pair<String,String>> {
+  val allowed=mapOf("name" to "nome COLLATE NOCASE", "code" to "codice COLLATE NOCASE", "city" to "citta COLLATE NOCASE", "zone" to "zona COLLATE NOCASE", "sector" to "settore COLLATE NOCASE", "visit" to "(SELECT MAX(data) FROM visite WHERE visite.codice=clienti.codice)", "count" to "(SELECT COUNT(*) FROM visite WHERE visite.codice=clienti.codice AND substr(data,1,4)=strftime('%Y','now','localtime'))")
+  val column=allowed[sort] ?: allowed.getValue("name")
+  val order=if(descending) "DESC" else "ASC"
+  val result=mutableListOf<Pair<String,String>>()
+  val pattern="%$q%"
+  readableDatabase.rawQuery("SELECT codice,nome FROM clienti WHERE codice LIKE ? OR nome LIKE ? OR citta LIKE ? OR settore LIKE ? OR zona LIKE ? ORDER BY $column $order, nome COLLATE NOCASE ASC, codice COLLATE NOCASE ASC",Array(5){pattern}).use { cursor ->
+   while(cursor.moveToNext()) result.add(cursor.getString(0) to cursor.getString(1))
+  }
+  return result
+ }
  fun get(code: String): Map<String,String>? {
   readableDatabase.query("clienti", fields.toTypedArray(), "codice=?", arrayOf(code),null,null,null).use { c ->
    if(!c.moveToFirst()) return null

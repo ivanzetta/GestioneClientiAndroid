@@ -52,6 +52,11 @@ class MainActivity: Activity() {
   }
   dialog.show()
  }
+ private var currentPage="list"
+ private var editingCustomerCode:String?=null
+ private var editingFields:Map<String,EditText> = emptyMap()
+ private var originalValues:Map<String,String> = emptyMap()
+ private var listFiltersVisible=true
  private var listSearch=""
  private var listZone=""
  private var listScrollY=0
@@ -142,7 +147,7 @@ class MainActivity: Activity() {
  private fun compactTextAction(symbol:String,description:String,action:()->Unit):TextView = TextView(this).apply {
   text=symbol;textSize=19f;gravity=android.view.Gravity.CENTER;setTextColor(ink)
   contentDescription=tr(description);background=shape(brandYellow)
-  layoutParams=LinearLayout.LayoutParams(dp(48),dp(48)).apply { marginEnd=dp(4) }
+  layoutParams=LinearLayout.LayoutParams(dp(36),dp(36)).apply { marginStart=dp(3) }
   setOnClickListener { action() }
  }
  private fun contactRow(label:String,value:String,symbol:String,action:()->Unit) {
@@ -155,9 +160,10 @@ class MainActivity: Activity() {
   background=shape(Color.WHITE,Color.rgb(223,199,137))
  }
  private fun screen(title:String):LinearLayout {
+  currentPage=when(title) { "YellowKunde" -> "list"; tr("Opzioni") -> "options"; tr("Sicurezza"),tr("Informazioni sull’app") -> "suboptions"; tr("Nuovo cliente"),tr("Modifica cliente") -> "edit"; else -> "detail" }
   root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(18),dp(22),dp(18),dp(20));setBackgroundColor(Color.rgb(249,249,247))}
   val scroll=ScrollView(this);scroll.addView(root);setContentView(scroll)
-  root.addView(TextView(this).apply{text=title;textSize=25f;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;setPadding(0,0,0,dp(18))})
+  if(title!="YellowKunde") root.addView(TextView(this).apply{text=title;textSize=25f;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;setPadding(0,0,0,dp(18))})
   return root
  }
  private val sortLabels=listOf("Nome cliente","Codice cliente","Città","Zona","Settore","Data ultima visita","Numero visite annuali")
@@ -168,30 +174,37 @@ class MainActivity: Activity() {
   val scroll=root.parent as ScrollView
   lateinit var searchBar:LinearLayout
   lateinit var sortAction:()->Unit
-  val toolbar=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
-  toolbar.addView(compactTextAction("＋","Nuovo cliente") { saveListPosition(scroll);edit(null) })
-  toolbar.addView(compactTextAction("☷","Filtri") { searchBar.visibility=if(searchBar.visibility==android.view.View.VISIBLE) android.view.View.GONE else android.view.View.VISIBLE })
-  toolbar.addView(compactTextAction("↕","Ordina clienti") { sortAction() })
-  toolbar.addView(compactTextAction("⚙","Opzioni") { saveListPosition(scroll);showOptions() })
-  root.addView(toolbar)
-  searchBar=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
-  val search=EditText(this).apply{hint=tr("Cerca codice, nome, città, settore, zona");setSingleLine(true);setText(q);textSize=14f}
-  searchBar.addView(search)
+  val header=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
+  header.addView(TextView(this).apply { text="YellowKunde";textSize=23f;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;layoutParams=LinearLayout.LayoutParams(0,dp(48),1f);gravity=android.view.Gravity.CENTER_VERTICAL })
+  header.addView(compactTextAction("+","Nuovo cliente") { saveListPosition(scroll);edit(null) })
+  header.addView(compactTextAction("☷","Filtri") { listFiltersVisible=!listFiltersVisible;searchBar.visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE })
+  header.addView(compactTextAction("↕","Ordina clienti") { sortAction() })
+  header.addView(compactTextAction("⚙","Opzioni") { saveListPosition(scroll);showOptions() })
+  root.addView(header)
+  searchBar=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL;visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE }
+  val searchRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
+  val search=EditText(this).apply{hint=tr("Cerca codice, nome, città, settore, zona");setSingleLine(true);setText(q);textSize=14f;setCompoundDrawablesWithIntrinsicBounds(android.R.drawable.ic_menu_search,0,0,0);compoundDrawablePadding=dp(7)}
+  searchRow.addView(search,LinearLayout.LayoutParams(0,dp(48),1f))
   val zoneOptions=listOf("") + db.zones()
-  val zoneSpinner=Spinner(this).apply { contentDescription=tr("Filtra per zona") }
-  zoneSpinner.adapter=ArrayAdapter(this,android.R.layout.simple_spinner_dropdown_item,zoneOptions.map { if(it.isBlank()) tr("Tutte le zone") else it })
-  val filterRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
-  filterRow.addView(TextView(this).apply { text=tr("Zona");textSize=13f;setTextColor(ink) })
-  filterRow.addView(zoneSpinner,LinearLayout.LayoutParams(0,dp(48),1f))
-  filterRow.addView(compactTextAction("×","Azzera filtri") {
+  val zoneLabels=zoneOptions.map { if(it.isBlank()) tr("Tutte le zone") else it }
+  val zoneAction=compactTextAction("⌖⌄","Zona") {}
+  fun updateZoneLabel() { zoneAction.contentDescription=tr("Zona")+": "+(if(listZone.isBlank()) tr("Tutte le zone") else listZone) }
+  updateZoneLabel()
+  searchRow.addView(zoneAction)
+  searchBar.addView(searchRow)
+  root.addView(searchBar)
+  val resetAction=compactTextAction("×","Azzera filtri") {
    listSearch="";listZone="";listScrollY=0
    prefs.edit().putString("sort_key","name").putBoolean("sort_desc",false).apply();showList("")
-  })
-  searchBar.addView(filterRow)
-  root.addView(searchBar)
-  val zoneIndex=zoneOptions.indexOf(listZone).coerceAtLeast(0)
-  if(zoneIndex==0) listZone=""
-  zoneSpinner.setSelection(zoneIndex)
+  }
+  // Reset remains accessible through the zone selector without taking a full row.
+  zoneAction.setOnClickListener {
+   val options=zoneLabels+tr("Azzera filtri")
+   AlertDialog.Builder(this).setTitle(tr("Zona")).setItems(options.toTypedArray()) { _,which ->
+    if(which==zoneLabels.size) resetAction.performClick()
+    else { listZone=zoneOptions[which];listScrollY=0;showList() }
+   }.setNegativeButton(tr("Annulla"),null).show()
+  }
   val list=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};root.addView(list)
   fun update(){
    list.removeAllViews()
@@ -225,12 +238,6 @@ class MainActivity: Activity() {
    override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){listSearch=s.toString();listScrollY=0;update()}
    override fun afterTextChanged(s:android.text.Editable?) {}
   })
-  zoneSpinner.onItemSelectedListener=object:android.widget.AdapterView.OnItemSelectedListener {
-   override fun onNothingSelected(parent:android.widget.AdapterView<*>?) {}
-   override fun onItemSelected(parent:android.widget.AdapterView<*>?,view:android.view.View?,position:Int,id:Long) {
-    listZone=zoneOptions[position];update()
-   }
-  }
   update()
   scroll.post { scroll.scrollTo(0,listScrollY) }
  }
@@ -309,12 +316,14 @@ class MainActivity: Activity() {
  private fun edit(code:String?) {
   val existing=code?.let{db.get(it)} ?: emptyMap()
   screen(if(code==null)tr("Nuovo cliente") else tr("Modifica cliente"))
+  editingCustomerCode=code;originalValues=existing
   val inputs=mutableMapOf<String,EditText>()
   fields.forEachIndexed{index,key->
    root.addView(TextView(this).apply{text=tr(captions[index])})
    val field=EditText(this).apply{setText(existing[key] ?: "");setSingleLine(key!="note");if(key=="note")minLines=3; if(key.startsWith("telefono"))inputType=InputType.TYPE_CLASS_PHONE; if(key.startsWith("email"))inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS}
    inputs[key]=field;root.addView(field)
   }
+  editingFields=inputs
   root.addView(button(tr("Salva")){
    try {db.save(code,inputs.mapValues{it.value.text.toString()});detail(inputs.getValue("codice").text.toString().trim())}
    catch(e:Exception){Toast.makeText(this,e.message ?: tr("Errore"),Toast.LENGTH_LONG).show()}
@@ -354,27 +363,16 @@ class MainActivity: Activity() {
    val share=Intent(Intent.ACTION_SEND).apply { type="text/plain";putExtra(Intent.EXTRA_TEXT,parts.filter{it.isNotBlank()}.joinToString("\n")) }
    startActivity(Intent.createChooser(share,tr("Condividi cliente")))
   })
-  actionRow.addView(iconButton("▦","Appuntamento Outlook") {
-   // Outlook Android does not reliably implement CalendarContract event insertion.
-   // Open the Outlook calendar compose page, allowing the user to choose the account type.
+  actionRow.addView(iconButton("▦","Appuntamento") {
    val subject="Visita – "+customer["nome"].orEmpty()
    val description="Cliente: "+customer["nome"].orEmpty()+"\nTelefono: "+customer["telefono_principale"].orEmpty()
-   val options=if(isGerman()) arrayOf("Geschäfts- oder Schulkonto", "Privates Outlook-Konto")
-               else arrayOf("Account aziendale o scolastico", "Account Outlook personale")
-   AlertDialog.Builder(this)
-    .setTitle(tr("Appuntamento Outlook"))
-    .setItems(options) { _,which ->
-     val base=if(which==0) "https://outlook.office.com/calendar/deeplink/compose"
-              else "https://outlook.live.com/calendar/0/deeplink/compose"
-     val url=Uri.parse(base).buildUpon()
-      .appendQueryParameter("subject",subject)
-      .appendQueryParameter("location",destination)
-      .appendQueryParameter("body",description)
-      .build()
-     openExternal(Intent(Intent.ACTION_VIEW,url))
-    }
-    .setNegativeButton(tr("Annulla"),null)
-    .show()
+   val intent=Intent(Intent.ACTION_INSERT).apply {
+    data=CalendarContract.Events.CONTENT_URI
+    putExtra(CalendarContract.Events.TITLE,subject)
+    putExtra(CalendarContract.Events.EVENT_LOCATION,destination)
+    putExtra(CalendarContract.Events.DESCRIPTION,description)
+   }
+   openExternal(intent)
   })
   val (count,last)=db.stats(code)
   val visits=db.visitEntries(code)
@@ -405,6 +403,23 @@ class MainActivity: Activity() {
   root.addView(button(tr("Annulla ultima visita")) {AlertDialog.Builder(this).setMessage(tr("Eliminare l'ultima visita registrata?")).setPositiveButton(tr("Sì")){_,_->db.undoLastVisit(code);detail(code)}.setNegativeButton(tr("No"),null).show()})
   root.addView(button(tr("Modifica cliente")){edit(code)})
   root.addView(button(tr("Elimina cliente")) {AlertDialog.Builder(this).setMessage(tr("Eliminare definitivamente questo cliente e tutte le visite?")).setPositiveButton(tr("Elimina")){_,_->db.delete(code);showList()}.setNegativeButton(tr("Annulla"),null).show()})
+ }
+ @Deprecated("Android back navigation")
+ override fun onBackPressed() {
+  when(currentPage) {
+   "options", "detail" -> showList()
+   "suboptions" -> showOptions()
+   "edit" -> {
+    val changed=editingFields.any { (key,field) -> field.text.toString() != (originalValues[key] ?: "") }
+    val goBack:()->Unit={ if(editingCustomerCode==null) showList() else detail(editingCustomerCode!!) }
+    if(changed) AlertDialog.Builder(this).setTitle(tr("Modifiche non salvate"))
+     .setMessage(tr("Vuoi uscire senza salvare le modifiche?"))
+     .setNegativeButton(tr("Annulla"),null)
+     .setPositiveButton(tr("Esci senza salvare")){_,_->goBack()}.show()
+    else goBack()
+   }
+   else -> super.onBackPressed()
+  }
  }
  private fun openExternal(intent:Intent) {
   try { startActivity(intent) }

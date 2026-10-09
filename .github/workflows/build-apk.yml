@@ -30,6 +30,19 @@ jobs:
             gradle assembleDebug
           fi
 
+          
+      - name: Verify APK
+        run: |
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          ls -lh "$APK"
+
+          echo "Checking APK signature..."
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+
+          echo "Checking APK information..."
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"
+
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:

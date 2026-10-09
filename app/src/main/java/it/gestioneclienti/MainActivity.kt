@@ -3,6 +3,7 @@ package it.gestioneclienti
 import android.content.Intent
 import android.net.Uri
 import android.provider.CalendarContract
+import android.app.DatePickerDialog
 import android.app.Activity
 import android.hardware.biometrics.BiometricPrompt
 import android.os.CancellationSignal
@@ -13,6 +14,9 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.ViewGroup
 import android.widget.*
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -24,6 +28,17 @@ class MainActivity: Activity() {
  private var unlocked=false
  private var prompting=false
  private var hasStarted=false
+ private var listSearch=""
+ private var listZone=""
+ private var listScrollY=0
+ private val displayDate:DateTimeFormatter=DateTimeFormatter.ofPattern("dd-MM-uuuu",Locale.ITALIAN)
+ private fun formatDate(value:String):String = runCatching { LocalDate.parse(value).format(displayDate) }.getOrDefault(value)
+ private fun pickDate(initial:LocalDate=LocalDate.now(), onPicked:(LocalDate)->Unit) {
+  DatePickerDialog(this,{ _,year,month,day -> onPicked(LocalDate.of(year,month+1,day)) },initial.year,initial.monthValue-1,initial.dayOfMonth).apply {
+   datePicker.maxDate=System.currentTimeMillis()
+  }.show()
+ }
+
  private lateinit var db:Database
  private val importRequest=101
  private val exportRequest=102
@@ -76,6 +91,18 @@ class MainActivity: Activity() {
   params.setMargins(0,dp(5),0,dp(5));layoutParams=params
   setOnClickListener{action()}
  }
+ private fun iconButton(symbol:String, description:String, action:()->Unit):TextView = TextView(this).apply {
+  text=symbol;contentDescription=tr(description);textSize=21f;gravity=android.view.Gravity.CENTER
+  setTextColor(ink);background=shape(brandYellow)
+  layoutParams=LinearLayout.LayoutParams(dp(44),dp(44)).apply { marginEnd=dp(7) }
+  setOnClickListener { action() }
+ }
+ private fun contactRow(label:String,value:String,symbol:String,action:()->Unit) {
+  if(value.isBlank()) return
+  val row=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL;setPadding(0,dp(4),0,dp(4)) }
+  row.addView(TextView(this).apply { text="${tr(label)}: $value";textSize=16f;setTextColor(ink);layoutParams=LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f) })
+  row.addView(iconButton(symbol,label,action));root.addView(row)
+ }
  private fun secondaryButton(label:String, action:()->Unit):Button=button(label,action).apply {
   background=shape(Color.WHITE,Color.rgb(223,199,137))
  }
@@ -87,20 +114,34 @@ class MainActivity: Activity() {
  }
  private val sortLabels=listOf("Nome cliente","Codice cliente","Città","Zona","Settore","Data ultima visita","Numero visite annuali")
  private val sortKeys=listOf("name","code","city","zone","sector","visit","count")
- private fun showList(q:String="") {
+ private fun showList(q:String=listSearch) {
+  listSearch=q
   screen(tr("Gestione Clienti"))
-  root.addView(button("＋ " + tr("Nuovo cliente")){edit(null)})
-  root.addView(secondaryButton("⚙ " + tr("Opzioni")){showOptions()})
+  val scroll=root.parent as ScrollView
+  root.addView(button("＋ " + tr("Nuovo cliente")){saveListPosition(scroll);edit(null)})
+  root.addView(secondaryButton("⚙ " + tr("Opzioni")){saveListPosition(scroll);showOptions()})
   val search=EditText(this).apply{hint=tr("Cerca codice, nome, città, settore, zona");setSingleLine(true);setText(q)}
   root.addView(search)
+  val zoneOptions=listOf("") + db.zones()
+  val zoneSpinner=Spinner(this)
+  zoneSpinner.adapter=ArrayAdapter(this,android.R.layout.simple_spinner_dropdown_item,zoneOptions.map { if(it.isBlank()) tr("Tutte le zone") else it })
+  root.addView(TextView(this).apply { text=tr("Filtra per zona");textSize=15f })
+  root.addView(zoneSpinner)
+  val zoneIndex=zoneOptions.indexOf(listZone).coerceAtLeast(0)
+  if(zoneIndex==0) listZone=""
+  zoneSpinner.setSelection(zoneIndex)
   val list=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};root.addView(list)
-  fun update(text:String){
+  fun update(){
    list.removeAllViews()
    val sort=prefs.getString("sort_key","name") ?: "name"
    val descending=prefs.getBoolean("sort_desc",false)
-   db.sortedList(text,sort,descending).forEach{(code,name)->list.addView(secondaryButton("$name  ·  $code"){detail(code)})}
+   db.sortedList(listSearch,sort,descending).forEach{(code,name)->
+    if(listZone.isBlank() || db.get(code)?.get("zona")?.trim()==listZone) {
+     list.addView(secondaryButton("$name  ·  $code"){saveListPosition(scroll);detail(code)})
+    }
+   }
   }
-  val sortButton=secondaryButton("↕ " + tr("Ordina clienti")){ 
+  val sortButton=secondaryButton("↕ " + tr("Ordina clienti")){
    val current=prefs.getString("sort_key","name") ?: "name"
    val selected=sortKeys.indexOf(current).coerceAtLeast(0)
    val choices=sortLabels.map{tr(it)}.toTypedArray()
@@ -111,14 +152,31 @@ class MainActivity: Activity() {
      AlertDialog.Builder(this).setTitle(tr("Direzione"))
       .setSingleChoiceItems(directions,if(prefs.getBoolean("sort_desc",false))1 else 0){d,choice->
        prefs.edit().putString("sort_key",sortKeys[which]).putBoolean("sort_desc",choice==1).apply()
-       d.dismiss();showList(search.text.toString())
+       d.dismiss();saveListPosition(scroll);showList()
       }.setNegativeButton(tr("Annulla"),null).show()
     }.setNegativeButton(tr("Annulla"),null).show()
   }
   root.addView(sortButton,root.indexOfChild(list))
-  search.addTextChangedListener(object:android.text.TextWatcher{override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){};override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){update(s.toString())};override fun afterTextChanged(s:android.text.Editable?) {}})
-  update(q)
+  root.addView(secondaryButton(tr("Azzera filtri")) {
+   listSearch="";listZone="";listScrollY=0
+   prefs.edit().putString("sort_key","name").putBoolean("sort_desc",false).apply()
+   showList("")
+  },root.indexOfChild(list))
+  search.addTextChangedListener(object:android.text.TextWatcher{
+   override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){}
+   override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){listSearch=s.toString();listScrollY=0;update()}
+   override fun afterTextChanged(s:android.text.Editable?) {}
+  })
+  zoneSpinner.onItemSelectedListener=object:android.widget.AdapterView.OnItemSelectedListener {
+   override fun onNothingSelected(parent:android.widget.AdapterView<*>?) {}
+   override fun onItemSelected(parent:android.widget.AdapterView<*>?,view:android.view.View?,position:Int,id:Long) {
+    listZone=zoneOptions[position];update()
+   }
+  }
+  update()
+  scroll.post { scroll.scrollTo(0,listScrollY) }
  }
+ private fun saveListPosition(scroll:ScrollView) { listScrollY=scroll.scrollY }
 
  private fun heading(label:String) {
   root.addView(TextView(this).apply { text=label; textSize=19f; setPadding(0,22,0,8) })
@@ -209,25 +267,27 @@ class MainActivity: Activity() {
   val customer=db.get(code) ?: run{showList();return}
   screen(customer["nome"].orEmpty())
   root.addView(button(tr("← Elenco clienti")){showList()})
-  fields.forEachIndexed{index,key->root.addView(TextView(this).apply{text="${tr(captions[index])}: ${customer[key].orEmpty()}";textSize=16f;setPadding(0,5,0,5)})}
-  fun addContactButton(label:String, value:String, action:()->Unit) {
-   if(value.isNotBlank()) root.addView(button(tr(label)){action()})
+  val actionFields=setOf("telefono_principale","telefono_secondario","email_principale","email_secondaria")
+  fields.forEachIndexed { index,key ->
+   if(key !in actionFields) root.addView(TextView(this).apply { text="${tr(captions[index])}: ${customer[key].orEmpty()}";textSize=16f;setPadding(0,5,0,5) })
   }
-  listOf("telefono_principale", "telefono_secondario").forEach { key ->
+  listOf("telefono_principale","telefono_secondario").forEach { key ->
    val number=customer[key].orEmpty().trim()
-   addContactButton("☎ Chiama",number) { openExternal(Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+Uri.encode(number)))) }
+   contactRow(captions[fields.indexOf(key)],number,"☎") { openExternal(Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+Uri.encode(number)))) }
   }
-  listOf("email_principale", "email_secondaria").forEach { key ->
+  listOf("email_principale","email_secondaria").forEach { key ->
    val email=customer[key].orEmpty().trim()
-   addContactButton("✉ Invia mail",email) { openExternal(Intent(Intent.ACTION_SENDTO,Uri.parse("mailto:"+Uri.encode(email)))) }
+   contactRow(captions[fields.indexOf(key)],email,"✉") { openExternal(Intent(Intent.ACTION_SENDTO,Uri.parse("mailto:"+Uri.encode(email)))) }
   }
   val destination=listOf("indirizzo","citta","provincia").map { customer[it].orEmpty().trim() }.filter { it.isNotBlank() }.joinToString(", ")
-  addContactButton("➤ Vai a",destination) {
+  val actionRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;setPadding(0,dp(8),0,dp(8)) }
+  if(destination.isNotBlank()) actionRow.addView(iconButton("➤","Vai a") {
    val maps=Intent(Intent.ACTION_VIEW,Uri.parse("google.navigation:q="+Uri.encode(destination))).setPackage("com.google.android.apps.maps")
    if(maps.resolveActivity(packageManager)!=null) openExternal(maps)
    else openExternal(Intent(Intent.ACTION_VIEW,Uri.parse("https://www.google.com/maps/dir/?api=1&destination="+Uri.encode(destination))))
-  }
-  root.addView(button(tr("Condividi cliente")) {
+  })
+  root.addView(actionRow)
+  actionRow.addView(iconButton("↗","Condividi cliente") {
    val parts=mutableListOf(customer["nome"].orEmpty(), destination)
    listOf("contatto_principale","telefono_principale","email_principale","contatto_secondario","telefono_secondario","email_secondaria").forEach { key ->
     customer[key]?.takeIf { it.isNotBlank() }?.let { parts.add(tr(captions[fields.indexOf(key)])+": "+it) }
@@ -236,7 +296,7 @@ class MainActivity: Activity() {
    val share=Intent(Intent.ACTION_SEND).apply { type="text/plain";putExtra(Intent.EXTRA_TEXT,parts.filter{it.isNotBlank()}.joinToString("\n")) }
    startActivity(Intent.createChooser(share,tr("Condividi cliente")))
   })
-  root.addView(button(tr("Appuntamento Outlook")) {
+  actionRow.addView(iconButton("▦","Appuntamento Outlook") {
    val intent=Intent(Intent.ACTION_INSERT).apply {
     data=CalendarContract.Events.CONTENT_URI
     putExtra(CalendarContract.Events.TITLE,"Visita – "+customer["nome"].orEmpty())
@@ -251,15 +311,30 @@ class MainActivity: Activity() {
    } else Toast.makeText(this,tr("Nessuna app calendario compatibile"),Toast.LENGTH_LONG).show()
   })
   val (count,last)=db.stats(code)
-  root.addView(TextView(this).apply{text=if(isGerman()) "Besuche ${java.time.LocalDate.now().year}: $count\nLetzter Besuch: $last\n\nVerlauf:\n${db.history(code)}" else "Visite ${java.time.LocalDate.now().year}: $count\nUltima visita: $last\n\nStorico:\n${db.history(code)}";textSize=17f;setPadding(0,15,0,15)})
+  val visits=db.visitEntries(code)
+  val visitHistory=visits.joinToString("\n") { "• ${it.second.format(displayDate)}" }
+  root.addView(TextView(this).apply {
+   text=if(isGerman()) "Besuche ${LocalDate.now().year}: $count\nLetzter Besuch: ${formatDate(last)}\n\nVerlauf:\n$visitHistory" else "Visite ${LocalDate.now().year}: $count\nUltima visita: ${formatDate(last)}\n\nStorico:\n$visitHistory"
+   textSize=17f;setPadding(0,15,0,15)
+  })
   root.addView(button(tr("Registra visita (oggi)")){db.visit(code);detail(code)})
-  root.addView(button(tr("Registra visita con altra data")) {
-   val input=EditText(this).apply { hint=tr("AAAA-MM-GG");setText(java.time.LocalDate.now().toString());setSingleLine(true) }
-   AlertDialog.Builder(this).setTitle(tr("Data della visita")).setView(input)
-    .setNegativeButton(tr("Annulla"),null).setPositiveButton(tr("Registra")) { _,_ ->
-     try { db.visit(code,java.time.LocalDate.parse(input.text.toString().trim()));detail(code) }
-     catch(e:Exception) { Toast.makeText(this,tr("Data non valida. Usa AAAA-MM-GG"),Toast.LENGTH_LONG).show() }
-    }.show()
+  root.addView(button(tr("Registra visita dal calendario")) {
+   pickDate { date ->
+    try { db.visit(code,date);detail(code) }
+    catch(e:Exception) { Toast.makeText(this,e.message ?: tr("Errore"),Toast.LENGTH_LONG).show() }
+   }
+  })
+  root.addView(button(tr("Modifica data visita")) {
+   val entries=db.visitEntries(code)
+   if(entries.isEmpty()) Toast.makeText(this,tr("Nessuna visita registrata"),Toast.LENGTH_SHORT).show()
+   else AlertDialog.Builder(this).setTitle(tr("Seleziona visita"))
+    .setItems(entries.map { it.second.format(displayDate) }.toTypedArray()) { _,index ->
+     val (id,date)=entries[index]
+     pickDate(date) { newDate ->
+      try { db.changeVisitDate(code,id,newDate);detail(code) }
+      catch(e:Exception) { Toast.makeText(this,e.message ?: tr("Errore"),Toast.LENGTH_LONG).show() }
+     }
+    }.setNegativeButton(tr("Annulla"),null).show()
   })
   root.addView(button(tr("Annulla ultima visita")) {AlertDialog.Builder(this).setMessage(tr("Eliminare l'ultima visita registrata?")).setPositiveButton(tr("Sì")){_,_->db.undoLastVisit(code);detail(code)}.setNegativeButton(tr("No"),null).show()})
   root.addView(button(tr("Modifica cliente")){edit(code)})

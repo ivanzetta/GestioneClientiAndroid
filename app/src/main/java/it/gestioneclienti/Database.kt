@@ -37,6 +37,23 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
   }
   return result
  }
+ fun zones():List<String> {
+  val zones=mutableListOf<String>()
+  readableDatabase.rawQuery("SELECT DISTINCT TRIM(zona) FROM clienti WHERE TRIM(zona) <> '' ORDER BY TRIM(zona) COLLATE NOCASE",null).use { c -> while(c.moveToNext()) zones.add(c.getString(0)) }
+  return zones
+ }
+ fun visitEntries(code:String):List<Pair<Long,LocalDate>> {
+  val entries=mutableListOf<Pair<Long,LocalDate>>()
+  readableDatabase.rawQuery("SELECT id,data FROM visite WHERE codice=? ORDER BY data DESC,id DESC",arrayOf(code)).use { c ->
+   while(c.moveToNext()) entries.add(c.getLong(0) to LocalDate.parse(c.getString(1)))
+  }
+  return entries
+ }
+ fun changeVisitDate(code:String,id:Long,date:LocalDate) {
+  require(!date.isAfter(LocalDate.now())) { "Non puoi registrare una visita futura" }
+  val values=android.content.ContentValues().apply { put("data",date.toString()) }
+  require(writableDatabase.update("visite",values,"id=? AND codice=?",arrayOf(id.toString(),code))==1) { "Visita non trovata" }
+ }
  fun get(code: String): Map<String,String>? {
   readableDatabase.query("clienti", fields.toTypedArray(), "codice=?", arrayOf(code),null,null,null).use { c ->
    if(!c.moveToFirst()) return null

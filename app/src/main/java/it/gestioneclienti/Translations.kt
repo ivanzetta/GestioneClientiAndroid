@@ -95,5 +95,13 @@ val translations:Map<String,String> = mapOf(
  "Appuntamento Outlook" to "Outlook-Termin",
  "Outlook non supporta questa apertura: scegli un calendario" to "Outlook unterstützt diesen Aufruf nicht: Kalender auswählen",
  "Nessuna app calendario compatibile" to "Keine kompatible Kalender-App",
- "Nessuna app compatibile" to "Keine kompatible App"
+ "Nessuna app compatibile" to "Keine kompatible App",
+ "Tutte le zone" to "Alle Gebiete",
+ "Filtra per zona" to "Nach Gebiet filtern",
+ "Azzera filtri" to "Filter zurücksetzen",
+ "Vai a" to "Route starten",
+ "Registra visita dal calendario" to "Besuch per Kalender erfassen",
+ "Modifica data visita" to "Besuchsdatum ändern",
+ "Seleziona visita" to "Besuch auswählen",
+ "Nessuna visita registrata" to "Keine Besuche erfasst"
 )

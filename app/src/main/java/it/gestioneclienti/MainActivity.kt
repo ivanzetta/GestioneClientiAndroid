@@ -2,6 +2,7 @@ package it.gestioneclienti
 
 import android.content.Intent
 import android.net.Uri
+import android.provider.CalendarContract
 import android.app.Activity
 import android.hardware.biometrics.BiometricPrompt
 import android.os.CancellationSignal
@@ -195,7 +196,7 @@ class MainActivity: Activity() {
   val inputs=mutableMapOf<String,EditText>()
   fields.forEachIndexed{index,key->
    root.addView(TextView(this).apply{text=tr(captions[index])})
-   val field=EditText(this).apply{setText(existing[key] ?: "");setSingleLine(key!="note");if(key=="note")minLines=3; if(key.startsWith("telefono"))inputType=InputType.TYPE_CLASS_PHONE}
+   val field=EditText(this).apply{setText(existing[key] ?: "");setSingleLine(key!="note");if(key=="note")minLines=3; if(key.startsWith("telefono"))inputType=InputType.TYPE_CLASS_PHONE; if(key.startsWith("email"))inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS}
    inputs[key]=field;root.addView(field)
   }
   root.addView(button(tr("Salva")){
@@ -209,6 +210,46 @@ class MainActivity: Activity() {
   screen(customer["nome"].orEmpty())
   root.addView(button(tr("← Elenco clienti")){showList()})
   fields.forEachIndexed{index,key->root.addView(TextView(this).apply{text="${tr(captions[index])}: ${customer[key].orEmpty()}";textSize=16f;setPadding(0,5,0,5)})}
+  fun addContactButton(label:String, value:String, action:()->Unit) {
+   if(value.isNotBlank()) root.addView(button(tr(label)){action()})
+  }
+  listOf("telefono_principale", "telefono_secondario").forEach { key ->
+   val number=customer[key].orEmpty().trim()
+   addContactButton("☎ Chiama",number) { openExternal(Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+Uri.encode(number)))) }
+  }
+  listOf("email_principale", "email_secondaria").forEach { key ->
+   val email=customer[key].orEmpty().trim()
+   addContactButton("✉ Invia mail",email) { openExternal(Intent(Intent.ACTION_SENDTO,Uri.parse("mailto:"+Uri.encode(email)))) }
+  }
+  val destination=listOf("indirizzo","citta","provincia").map { customer[it].orEmpty().trim() }.filter { it.isNotBlank() }.joinToString(", ")
+  addContactButton("➤ Vai a",destination) {
+   val maps=Intent(Intent.ACTION_VIEW,Uri.parse("google.navigation:q="+Uri.encode(destination))).setPackage("com.google.android.apps.maps")
+   if(maps.resolveActivity(packageManager)!=null) openExternal(maps)
+   else openExternal(Intent(Intent.ACTION_VIEW,Uri.parse("https://www.google.com/maps/dir/?api=1&destination="+Uri.encode(destination))))
+  }
+  root.addView(button(tr("Condividi cliente")) {
+   val parts=mutableListOf(customer["nome"].orEmpty(), destination)
+   listOf("contatto_principale","telefono_principale","email_principale","contatto_secondario","telefono_secondario","email_secondaria").forEach { key ->
+    customer[key]?.takeIf { it.isNotBlank() }?.let { parts.add(tr(captions[fields.indexOf(key)])+": "+it) }
+   }
+   if(destination.isNotBlank()) parts.add("Google Maps: https://www.google.com/maps/search/?api=1&query="+Uri.encode(destination))
+   val share=Intent(Intent.ACTION_SEND).apply { type="text/plain";putExtra(Intent.EXTRA_TEXT,parts.filter{it.isNotBlank()}.joinToString("\n")) }
+   startActivity(Intent.createChooser(share,tr("Condividi cliente")))
+  })
+  root.addView(button(tr("Appuntamento Outlook")) {
+   val intent=Intent(Intent.ACTION_INSERT).apply {
+    data=CalendarContract.Events.CONTENT_URI
+    putExtra(CalendarContract.Events.TITLE,"Visita – "+customer["nome"].orEmpty())
+    putExtra(CalendarContract.Events.EVENT_LOCATION,destination)
+    putExtra(CalendarContract.Events.DESCRIPTION,"Cliente: "+customer["nome"].orEmpty()+"\n"+customer["telefono_principale"].orEmpty())
+   }
+   val outlook=Intent(intent).setPackage("com.microsoft.office.outlook")
+   if(outlook.resolveActivity(packageManager)!=null) openExternal(outlook)
+   else if(intent.resolveActivity(packageManager)!=null) {
+    Toast.makeText(this,tr("Outlook non supporta questa apertura: scegli un calendario"),Toast.LENGTH_LONG).show()
+    openExternal(intent)
+   } else Toast.makeText(this,tr("Nessuna app calendario compatibile"),Toast.LENGTH_LONG).show()
+  })
   val (count,last)=db.stats(code)
   root.addView(TextView(this).apply{text=if(isGerman()) "Besuche ${java.time.LocalDate.now().year}: $count\nLetzter Besuch: $last\n\nVerlauf:\n${db.history(code)}" else "Visite ${java.time.LocalDate.now().year}: $count\nUltima visita: $last\n\nStorico:\n${db.history(code)}";textSize=17f;setPadding(0,15,0,15)})
   root.addView(button(tr("Registra visita (oggi)")){db.visit(code);detail(code)})
@@ -223,6 +264,10 @@ class MainActivity: Activity() {
   root.addView(button(tr("Annulla ultima visita")) {AlertDialog.Builder(this).setMessage(tr("Eliminare l'ultima visita registrata?")).setPositiveButton(tr("Sì")){_,_->db.undoLastVisit(code);detail(code)}.setNegativeButton(tr("No"),null).show()})
   root.addView(button(tr("Modifica cliente")){edit(code)})
   root.addView(button(tr("Elimina cliente")) {AlertDialog.Builder(this).setMessage(tr("Eliminare definitivamente questo cliente e tutte le visite?")).setPositiveButton(tr("Elimina")){_,_->db.delete(code);showList()}.setNegativeButton(tr("Annulla"),null).show()})
+ }
+ private fun openExternal(intent:Intent) {
+  try { startActivity(intent) }
+  catch(e:Exception) { Toast.makeText(this,tr("Nessuna app compatibile"),Toast.LENGTH_LONG).show() }
  }
  private fun askBackupPassword(title:String, action:(CharArray)->Unit) {
   val input=EditText(this).apply { inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD }

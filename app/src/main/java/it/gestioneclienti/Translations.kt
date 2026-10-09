@@ -86,4 +86,14 @@ val translations:Map<String,String> = mapOf(
  "Contatto secondario" to "Zweitkontakt",
  "Telefono secondario" to "Zweittelefon",
  "Note" to "Notizen",
+ "Email principale" to "Primäre E-Mail",
+ "Email secondaria" to "Sekundäre E-Mail",
+ "☎ Chiama" to "☎ Anrufen",
+ "✉ Invia mail" to "✉ E-Mail senden",
+ "➤ Vai a" to "➤ Route starten",
+ "Condividi cliente" to "Kunde teilen",
+ "Appuntamento Outlook" to "Outlook-Termin",
+ "Outlook non supporta questa apertura: scegli un calendario" to "Outlook unterstützt diesen Aufruf nicht: Kalender auswählen",
+ "Nessuna app calendario compatibile" to "Keine kompatible Kalender-App",
+ "Nessuna app compatibile" to "Keine kompatible App"
 )

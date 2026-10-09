@@ -5,16 +5,21 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import java.time.LocalDate
 
-val fields = listOf("codice", "nome", "indirizzo", "citta", "provincia", "zona", "settore", "contatto_principale", "telefono_principale", "contatto_secondario", "telefono_secondario", "note")
-val captions = listOf("Codice cliente", "Nome", "Indirizzo", "Città", "Provincia", "Zona", "Settore", "Contatto principale", "Telefono principale", "Contatto secondario", "Telefono secondario", "Note")
-class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 1) {
+val fields = listOf("codice", "nome", "indirizzo", "citta", "provincia", "zona", "settore", "contatto_principale", "telefono_principale", "email_principale", "contatto_secondario", "telefono_secondario", "email_secondaria", "note")
+val captions = listOf("Codice cliente", "Nome", "Indirizzo", "Città", "Provincia", "Zona", "Settore", "Contatto principale", "Telefono principale", "Email principale", "Contatto secondario", "Telefono secondario", "Email secondaria", "Note")
+class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 2) {
  override fun onCreate(db: SQLiteDatabase) {
-  db.execSQL("CREATE TABLE clienti (codice TEXT PRIMARY KEY, nome TEXT NOT NULL DEFAULT '', indirizzo TEXT NOT NULL DEFAULT '', citta TEXT NOT NULL DEFAULT '', provincia TEXT NOT NULL DEFAULT '', zona TEXT NOT NULL DEFAULT '', settore TEXT NOT NULL DEFAULT '', contatto_principale TEXT NOT NULL DEFAULT '', telefono_principale TEXT NOT NULL DEFAULT '', contatto_secondario TEXT NOT NULL DEFAULT '', telefono_secondario TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '')")
+  db.execSQL("CREATE TABLE clienti (codice TEXT PRIMARY KEY, nome TEXT NOT NULL DEFAULT '', indirizzo TEXT NOT NULL DEFAULT '', citta TEXT NOT NULL DEFAULT '', provincia TEXT NOT NULL DEFAULT '', zona TEXT NOT NULL DEFAULT '', settore TEXT NOT NULL DEFAULT '', contatto_principale TEXT NOT NULL DEFAULT '', telefono_principale TEXT NOT NULL DEFAULT '', email_principale TEXT NOT NULL DEFAULT '', contatto_secondario TEXT NOT NULL DEFAULT '', telefono_secondario TEXT NOT NULL DEFAULT '', email_secondaria TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '')")
   db.execSQL("CREATE TABLE visite (id INTEGER PRIMARY KEY AUTOINCREMENT, codice TEXT NOT NULL REFERENCES clienti(codice) ON DELETE CASCADE, data TEXT NOT NULL)")
   db.execSQL("CREATE INDEX idx_visite_cliente ON visite(codice, data)")
  }
  override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
- override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {}
+ override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+  if(oldVersion < 2) {
+   db.execSQL("ALTER TABLE clienti ADD COLUMN email_principale TEXT NOT NULL DEFAULT ''")
+   db.execSQL("ALTER TABLE clienti ADD COLUMN email_secondaria TEXT NOT NULL DEFAULT ''")
+  }
+ }
  fun list(q: String): List<Pair<String,String>> {
   val result= mutableListOf<Pair<String,String>>()
   val pattern="%$q%"
@@ -72,7 +77,7 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
   try {
    rows.forEach { values ->
     val cv=android.content.ContentValues()
-    fields.forEach { cv.put(it, values[it].orEmpty()) }
+    fields.filter { it in values }.forEach { cv.put(it, values[it].orEmpty()) }
     val updated = database.update("clienti",cv,"codice=?",arrayOf(values.getValue("codice")))
     if(updated == 0) database.insertOrThrow("clienti",null,cv)
    }

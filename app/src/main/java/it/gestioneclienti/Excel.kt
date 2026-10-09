@@ -17,11 +17,11 @@ object Excel {
     val iterator=sheet.iterator()
     require(iterator.hasNext()) { "File Excel vuoto" }
     val header=iterator.next().map { formatter.formatCellValue(it).trim().lowercase() }
-    require(fields.all { it in header }) { "Colonne mancanti: ${fields.filter { it !in header }.joinToString()}" }
+    require(fields.filterNot { it.startsWith("email_") }.all { it in header }) { "Colonne mancanti: ${fields.filterNot { it.startsWith("email_") || it in header }.joinToString()}" }
     val seen=mutableSetOf<String>()
     while(iterator.hasNext()) {
      val row=iterator.next()
-     val values=fields.associateWith { key -> formatter.formatCellValue(row.getCell(header.indexOf(key))).trim() }
+     val values=fields.filter { it in header }.associateWith { key -> formatter.formatCellValue(row.getCell(header.indexOf(key))).trim() }
      val code=values.getValue("codice")
      if(code.isBlank() && values.values.all { it.isBlank() }) continue
      require(code.isNotBlank()) { "Codice cliente mancante alla riga ${row.rowNum+1}" }

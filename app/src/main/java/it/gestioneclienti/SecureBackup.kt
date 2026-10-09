@@ -48,7 +48,7 @@ object SecureBackup {
   val root=JSONObject(String(plaintext,Charsets.UTF_8))
   require(root.getInt("version")==1) { "Versione backup non supportata" }
   val c=root.getJSONArray("clienti");val v=root.getJSONArray("visite")
-  val customers=(0 until c.length()).map { i -> val item=c.getJSONObject(i);fields.associateWith { item.getString(it) } }
+  val customers=(0 until c.length()).map { i -> val item=c.getJSONObject(i);fields.associateWith { item.optString(it, "") } }
   val visits=(0 until v.length()).map { i -> val item=v.getJSONObject(i);item.getString("codice") to item.getString("data") }
   db.restoreSnapshot(customers,visits)
   return customers.size to visits.size

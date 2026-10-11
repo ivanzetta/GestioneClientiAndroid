@@ -30,6 +30,10 @@ class MainActivity: Activity() {
  private fun tr(it:String):String = if(prefs.getString("language", "it") == "de") translations[it] ?: it else it
  private fun isGerman() = prefs.getString("language", "it") == "de"
  private var unlocked=false
+ private var lockedSinceAuth=false
+ private lateinit var keyguardManager:KeyguardManager
+ private val infoKeys=(1..5).map { "info$it" }
+ private fun infoLabel(key:String)=prefs.getString("label_$key","Info"+key.removePrefix("info")) ?: key
  private var prompting=false
  private var hasStarted=false
  private var activationDialogShowing=false
@@ -75,7 +79,9 @@ class MainActivity: Activity() {
  private val restoreRequest=104
  private var backupPassword:CharArray?=null
  private lateinit var root:LinearLayout
- override fun onCreate(savedInstanceState:Bundle?) { super.onCreate(savedInstanceState); db=Database(this); checkActivation() }
+ override fun onCreate(savedInstanceState:Bundle?) { super.onCreate(savedInstanceState); db=Database(this); keyguardManager=getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+  registerReceiver(object:android.content.BroadcastReceiver(){ override fun onReceive(context:Context?, intent:Intent?) { lockedSinceAuth=true;unlocked=false } },android.content.IntentFilter(Intent.ACTION_SCREEN_OFF))
+  checkActivation() }
  private fun authenticate() {
   if (unlocked || prompting) return
   val km=getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
@@ -98,15 +104,15 @@ class MainActivity: Activity() {
    .build()
   prompt.authenticate(CancellationSignal(), mainExecutor, object:BiometricPrompt.AuthenticationCallback() {
    override fun onAuthenticationSucceeded(result:BiometricPrompt.AuthenticationResult) {
-    prompting=false;unlocked=true;showList()
+    prompting=false;unlocked=true;lockedSinceAuth=false;showList()
    }
    override fun onAuthenticationError(errorCode:Int, errString:CharSequence) {
     prompting=false; if(!unlocked) finish()
    }
   })
  }
- override fun onStop() { super.onStop(); unlocked=false; prompting=false }
- override fun onStart() { super.onStart(); if (hasStarted && ::db.isInitialized && !unlocked) checkActivation(); hasStarted=true }
+ override fun onStop() { super.onStop() }
+ override fun onStart() { super.onStart(); if (hasStarted && ::db.isInitialized && (!unlocked || lockedSinceAuth || keyguardManager.isKeyguardLocked)) { unlocked=false;checkActivation() }; hasStarted=true }
  private val brandYellow=Color.rgb(250,179,0)
  private val ink=Color.rgb(34,34,34)
  private fun dp(n:Int):Int=(n*resources.displayMetrics.density).toInt()
@@ -166,6 +172,7 @@ class MainActivity: Activity() {
   if(title!="YellowKunde") root.addView(TextView(this).apply{text=title;textSize=25f;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;setPadding(0,0,0,dp(18))})
   return root
  }
+ private val selectedZones=mutableSetOf<String>()
  private val sortLabels=listOf("Nome cliente","Codice cliente","Città","Zona","Settore","Data ultima visita","Numero visite annuali")
  private val sortKeys=listOf("name","code","city","zone","sector","visit","count")
  private fun showList(q:String=listSearch) {
@@ -185,25 +192,26 @@ class MainActivity: Activity() {
   val searchRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
   val search=EditText(this).apply{hint=tr("Cerca codice, nome, città, settore, zona");setSingleLine(true);setText(q);textSize=14f;setCompoundDrawablesWithIntrinsicBounds(android.R.drawable.ic_menu_search,0,0,0);compoundDrawablePadding=dp(7)}
   searchRow.addView(search,LinearLayout.LayoutParams(0,dp(48),1f))
-  val zoneOptions=listOf("") + db.zones()
-  val zoneLabels=zoneOptions.map { if(it.isBlank()) tr("Tutte le zone") else it }
+  val zoneOptions=db.zones()
+  val zoneLabels=zoneOptions
   val zoneAction=compactTextAction("⌖⌄","Zona") {}
-  fun updateZoneLabel() { zoneAction.contentDescription=tr("Zona")+": "+(if(listZone.isBlank()) tr("Tutte le zone") else listZone) }
+  fun updateZoneLabel() { zoneAction.contentDescription=tr("Zona")+": "+(if(selectedZones.isEmpty()) tr("Tutte le zone") else selectedZones.joinToString(", ")) }
   updateZoneLabel()
   searchRow.addView(zoneAction)
   searchBar.addView(searchRow)
   root.addView(searchBar)
   val resetAction=compactTextAction("×","Azzera filtri") {
-   listSearch="";listZone="";listScrollY=0
+   listSearch="";listZone="";selectedZones.clear();listScrollY=0
    prefs.edit().putString("sort_key","name").putBoolean("sort_desc",false).apply();showList("")
   }
   // Reset remains accessible through the zone selector without taking a full row.
   zoneAction.setOnClickListener {
-   val options=zoneLabels+tr("Azzera filtri")
-   AlertDialog.Builder(this).setTitle(tr("Zona")).setItems(options.toTypedArray()) { _,which ->
-    if(which==zoneLabels.size) resetAction.performClick()
-    else { listZone=zoneOptions[which];listScrollY=0;showList() }
-   }.setNegativeButton(tr("Annulla"),null).show()
+   val checked=zoneOptions.map { it in selectedZones }.toBooleanArray()
+   AlertDialog.Builder(this).setTitle(tr("Zona"))
+    .setMultiChoiceItems(zoneLabels.toTypedArray(),checked){_,which,value->checked[which]=value}
+    .setNeutralButton(tr("Tutte le zone")){_,_->selectedZones.clear();listScrollY=0;showList()}
+    .setNegativeButton(tr("Annulla"),null)
+    .setPositiveButton(tr("Applica")){_,_->selectedZones.clear();zoneOptions.forEachIndexed{ i,z->if(checked[i]) selectedZones.add(z) };listScrollY=0;showList()}.show()
   }
   val list=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};root.addView(list)
   fun update(){
@@ -211,7 +219,7 @@ class MainActivity: Activity() {
    val sort=prefs.getString("sort_key","name") ?: "name"
    val descending=prefs.getBoolean("sort_desc",false)
    db.sortedList(listSearch,sort,descending).forEach{(code,name)->
-    if(listZone.isBlank() || db.get(code)?.get("zona")?.trim()==listZone) {
+    if(selectedZones.isEmpty() || db.get(code)?.get("zona")?.trim() in selectedZones) {
      list.addView(secondaryButton("$name  ·  $code"){saveListPosition(scroll);detail(code)})
     }
    }
@@ -279,12 +287,43 @@ class MainActivity: Activity() {
     }.show()
   })
 
+  heading("Personalizza campi Info")
+  root.addView(button("Modifica etichette Info1–Info5"){showInfoSettings()})
   heading(tr("Sicurezza"))
   root.addView(button(tr("Sicurezza")){showSecurity()})
   heading(tr("Lingua"))
   root.addView(button(tr("Lingua") + " / Sprache"){chooseLanguage()})
   heading(tr("Informazioni sull’app"))
   root.addView(button(tr("Informazioni sull’app")){showAbout()})
+ }
+ private fun showInfoSettings() {
+  screen("Personalizza campi Info")
+  root.addView(button("← " + tr("Indietro")){showOptions()})
+  infoKeys.forEach { key ->
+   root.addView(button("${key.uppercase()}: ${infoLabel(key)}") {
+    val input=EditText(this).apply { setSingleLine(true);setText(infoLabel(key)) }
+    AlertDialog.Builder(this).setTitle("Nuova etichetta per ${key.uppercase()}").setView(input)
+     .setNegativeButton(tr("Annulla"),null)
+     .setPositiveButton(tr("Salva")){_,_->
+      val label=input.text.toString().trim()
+      if(label.isBlank()) { Toast.makeText(this,"L'etichetta non può essere vuota",Toast.LENGTH_LONG).show();return@setPositiveButton }
+      if(label==infoLabel(key)) {showInfoSettings();return@setPositiveButton}
+      AlertDialog.Builder(this).setTitle("Etichetta modificata")
+       .setMessage("Vuoi impostare il campo '$label' su Falso per tutti i clienti?")
+       .setNegativeButton("Mantieni valori"){_,_->prefs.edit().putString("label_$key",label).apply();showInfoSettings()}
+       .setPositiveButton("Imposta tutti su Falso"){_,_->
+        AlertDialog.Builder(this).setTitle("Confermi l'azzeramento?")
+         .setMessage("Il campo '$label' sarà Falso per tutti i clienti. L'operazione non è annullabile automaticamente.")
+         .setNegativeButton(tr("Annulla"),null)
+         .setPositiveButton("Conferma"){_,_->db.setInfoFalseForAll(key);prefs.edit().putString("label_$key",label).apply();showInfoSettings()}.show()
+       }.show()
+     }.show()
+   })
+  }
+  root.addView(secondaryButton("Ripristina nomi predefiniti") {
+   AlertDialog.Builder(this).setMessage("Ripristinare i nomi Info1–Info5 senza modificare i valori dei clienti?")
+    .setNegativeButton(tr("Annulla"),null).setPositiveButton("Ripristina"){_,_->val editor=prefs.edit();infoKeys.forEach{editor.remove("label_$it")};editor.apply();showInfoSettings()}.show()
+  })
  }
  private fun showSecurity() {
   screen(tr("Sicurezza"))
@@ -309,7 +348,7 @@ class MainActivity: Activity() {
   root.addView(button("← " + tr("Indietro")){showOptions()})
   val packageInfo=packageManager.getPackageInfo(packageName,0)
   root.addView(TextView(this).apply {
-   text="YellowKunde\n${tr("Versione")}: ${packageInfo.versionName}"
+   text="YellowKunde\n${tr("Versione")}: ${packageInfo.versionName}\nSviluppato da: Ivan V."
    textSize=18f
   })
  }
@@ -318,14 +357,17 @@ class MainActivity: Activity() {
   screen(if(code==null)tr("Nuovo cliente") else tr("Modifica cliente"))
   editingCustomerCode=code;originalValues=existing
   val inputs=mutableMapOf<String,EditText>()
+  val checks=mutableMapOf<String,android.widget.CheckBox>()
   fields.forEachIndexed{index,key->
+   if(key=="info1") root.addView(TextView(this).apply{text="Informazioni aggiuntive";textSize=19f;typeface=Typeface.DEFAULT_BOLD})
+   if(key in infoKeys) { val check=android.widget.CheckBox(this).apply { text=infoLabel(key);isChecked=existing[key].equals("true",true) || existing[key]=="1" };checks[key]=check;root.addView(check);return@forEachIndexed }
    root.addView(TextView(this).apply{text=tr(captions[index])})
    val field=EditText(this).apply{setText(existing[key] ?: "");setSingleLine(key!="note");if(key=="note")minLines=3; if(key.startsWith("telefono"))inputType=InputType.TYPE_CLASS_PHONE; if(key.startsWith("email"))inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS}
    inputs[key]=field;root.addView(field)
   }
   editingFields=inputs
   root.addView(button(tr("Salva")){
-   try {db.save(code,inputs.mapValues{it.value.text.toString()});detail(inputs.getValue("codice").text.toString().trim())}
+   try {db.save(code,inputs.mapValues{it.value.text.toString()} + checks.mapValues { if(it.value.isChecked) "true" else "false" });detail(inputs.getValue("codice").text.toString().trim())}
    catch(e:Exception){Toast.makeText(this,e.message ?: tr("Errore"),Toast.LENGTH_LONG).show()}
   })
   root.addView(button(tr("Annulla")){if(code==null)showList() else detail(code)})
@@ -336,7 +378,7 @@ class MainActivity: Activity() {
   root.addView(button(tr("← Elenco clienti")){showList()})
   val actionFields=setOf("telefono_principale","telefono_secondario","email_principale","email_secondaria")
   fields.forEachIndexed { index,key ->
-   if(key !in actionFields) root.addView(TextView(this).apply { text="${tr(captions[index])}: ${customer[key].orEmpty()}";textSize=16f;setPadding(0,5,0,5) })
+   if(key !in actionFields) root.addView(TextView(this).apply { text="${if(key in infoKeys) infoLabel(key) else tr(captions[index])}: ${if(key in infoKeys) (if(customer[key].equals("true",true) || customer[key]=="1") "☑" else "☐") else customer[key].orEmpty()}";textSize=16f;setPadding(0,5,0,5) })
   }
   listOf("telefono_principale","telefono_secondario").forEach { key ->
    val number=customer[key].orEmpty().trim()
@@ -346,7 +388,7 @@ class MainActivity: Activity() {
    val email=customer[key].orEmpty().trim()
    contactRow(captions[fields.indexOf(key)],email,"✉") { openExternal(Intent(Intent.ACTION_SENDTO,Uri.parse("mailto:"+Uri.encode(email)))) }
   }
-  val destination=listOf("indirizzo","citta","provincia").map { customer[it].orEmpty().trim() }.filter { it.isNotBlank() }.joinToString(", ")
+  val destination=listOf("indirizzo","cap","citta","provincia").map { customer[it].orEmpty().trim() }.filter { it.isNotBlank() }.joinToString(", ")
   val actionRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;setPadding(0,dp(8),0,dp(8)) }
   if(destination.isNotBlank()) actionRow.addView(iconButton("➤","Vai a") {
    val maps=Intent(Intent.ACTION_VIEW,Uri.parse("google.navigation:q="+Uri.encode(destination))).setPackage("com.google.android.apps.maps")
@@ -364,13 +406,15 @@ class MainActivity: Activity() {
    startActivity(Intent.createChooser(share,tr("Condividi cliente")))
   })
   actionRow.addView(iconButton("▦","Appuntamento") {
-   val subject="Visita – "+customer["nome"].orEmpty()
+   val subject="Appuntamento – "+customer["nome"].orEmpty()
    val description="Cliente: "+customer["nome"].orEmpty()+"\nTelefono: "+customer["telefono_principale"].orEmpty()
    val intent=Intent(Intent.ACTION_INSERT).apply {
     data=CalendarContract.Events.CONTENT_URI
     putExtra(CalendarContract.Events.TITLE,subject)
     putExtra(CalendarContract.Events.EVENT_LOCATION,destination)
     putExtra(CalendarContract.Events.DESCRIPTION,description)
+    putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME,System.currentTimeMillis())
+    putExtra(CalendarContract.EXTRA_EVENT_END_TIME,System.currentTimeMillis()+60*60*1000)
    }
    openExternal(intent)
   })

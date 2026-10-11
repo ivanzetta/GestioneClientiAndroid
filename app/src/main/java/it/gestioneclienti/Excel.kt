@@ -17,7 +17,7 @@ object Excel {
     val iterator=sheet.iterator()
     require(iterator.hasNext()) { "File Excel vuoto" }
     val header=iterator.next().map { formatter.formatCellValue(it).trim().lowercase() }
-    require(fields.filterNot { it.startsWith("email_") }.all { it in header }) { "Colonne mancanti: ${fields.filterNot { it.startsWith("email_") || it in header }.joinToString()}" }
+    require(fields.filterNot { it.startsWith("email_") || it=="cap" || it.matches(Regex("info[1-5]")) }.all { it in header }) { "Colonne mancanti: ${fields.filterNot { it.startsWith("email_") || it=="cap" || it.matches(Regex("info[1-5]")) || it in header }.joinToString()}" }
     val seen=mutableSetOf<String>()
     while(iterator.hasNext()) {
      val row=iterator.next()

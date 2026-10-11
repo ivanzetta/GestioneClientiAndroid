@@ -150,6 +150,17 @@ class MainActivity: Activity() {
   layoutParams=LinearLayout.LayoutParams(dp(48),dp(48)).apply { marginEnd=dp(4) }
   setOnClickListener { action() }
  }
+ private fun homeIconAction(icon:Int,description:String,action:()->Unit):ImageButton = ImageButton(this).apply {
+  setImageResource(icon)
+  imageTintList=android.content.res.ColorStateList.valueOf(Color.BLACK)
+  contentDescription=tr(description)
+  scaleType=android.widget.ImageView.ScaleType.FIT_CENTER
+  background=shape(brandYellow)
+  setPadding(dp(7),dp(7),dp(7),dp(7))
+  minimumWidth=0;minimumHeight=0
+  layoutParams=LinearLayout.LayoutParams(dp(36),dp(36)).apply { marginStart=dp(3) }
+  setOnClickListener { action() }
+ }
  private fun compactTextAction(symbol:String,description:String,action:()->Unit):TextView = TextView(this).apply {
   text=symbol;textSize=19f;gravity=android.view.Gravity.CENTER;setTextColor(ink)
   contentDescription=tr(description);background=shape(brandYellow)
@@ -178,23 +189,24 @@ class MainActivity: Activity() {
  private fun showList(q:String=listSearch) {
   listSearch=q
   screen("YellowKunde")
+  root.setPadding(dp(10),dp(22),dp(10),dp(20))
   val scroll=root.parent as ScrollView
   lateinit var searchBar:LinearLayout
   lateinit var sortAction:()->Unit
   val header=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
-  header.addView(TextView(this).apply { text="YellowKunde";textSize=23f;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;layoutParams=LinearLayout.LayoutParams(0,dp(48),1f);gravity=android.view.Gravity.CENTER_VERTICAL })
-  header.addView(compactTextAction("+","Nuovo cliente") { saveListPosition(scroll);edit(null) })
-  header.addView(compactTextAction("☷","Filtri") { listFiltersVisible=!listFiltersVisible;searchBar.visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE })
-  header.addView(compactTextAction("↕","Ordina clienti") { sortAction() })
-  header.addView(compactTextAction("⚙","Opzioni") { saveListPosition(scroll);showOptions() })
+  header.addView(TextView(this).apply { text="YellowKunde";textSize=19f;setSingleLine(true);ellipsize=android.text.TextUtils.TruncateAt.END;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;layoutParams=LinearLayout.LayoutParams(0,dp(44),1f);gravity=android.view.Gravity.CENTER_VERTICAL })
+  header.addView(homeIconAction(R.drawable.ic_home_add,"Nuovo cliente") { saveListPosition(scroll);edit(null) })
+  header.addView(homeIconAction(R.drawable.ic_home_filter,"Filtri") { listFiltersVisible=!listFiltersVisible;searchBar.visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE })
+  header.addView(homeIconAction(R.drawable.ic_home_sort,"Ordina clienti") { sortAction() })
+  header.addView(homeIconAction(R.drawable.ic_home_settings,"Opzioni") { saveListPosition(scroll);showOptions() })
   root.addView(header)
   searchBar=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL;visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE }
   val searchRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
-  val search=EditText(this).apply{hint=tr("Cerca codice, nome, città, settore, zona");setSingleLine(true);setText(q);textSize=14f;setCompoundDrawablesWithIntrinsicBounds(android.R.drawable.ic_menu_search,0,0,0);compoundDrawablePadding=dp(7)}
+  val search=EditText(this).apply{hint=tr("Cerca codice, nome, città, settore, zona");setSingleLine(true);setText(q);textSize=14f;setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_home_search,0,0,0);compoundDrawablePadding=dp(7)}
   searchRow.addView(search,LinearLayout.LayoutParams(0,dp(48),1f))
   val zoneOptions=db.zones()
   val zoneLabels=zoneOptions
-  val zoneAction=compactTextAction("⌖⌄","Zona") {}
+  val zoneAction=homeIconAction(R.drawable.ic_home_zone,"Zona") {}
   fun updateZoneLabel() { zoneAction.contentDescription=tr("Zona")+": "+(if(selectedZones.isEmpty()) tr("Tutte le zone") else selectedZones.joinToString(", ")) }
   updateZoneLabel()
   searchRow.addView(zoneAction)

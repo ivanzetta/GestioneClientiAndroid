@@ -24,6 +24,11 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
    for(i in 1..5) db.execSQL("ALTER TABLE clienti ADD COLUMN info$i TEXT NOT NULL DEFAULT 'false'")
   }
  }
+ fun setCustomerInfo(code:String,key:String,checked:Boolean) {
+  require(key in (1..5).map { "info$it" }) { "Campo Info non valido" }
+  val values=android.content.ContentValues().apply { put(key,if(checked) "true" else "false") }
+  require(writableDatabase.update("clienti",values,"codice=?",arrayOf(code))==1) { "Cliente non trovato" }
+ }
  fun setInfoFalseForAll(key:String) {
   require(key in (1..5).map { "info$it" })
   val values=android.content.ContentValues().apply { put(key,"false") }

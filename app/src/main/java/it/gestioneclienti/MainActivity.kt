@@ -80,6 +80,8 @@ class MainActivity: Activity() {
  private var backupPassword:CharArray?=null
  private lateinit var root:LinearLayout
  override fun onCreate(savedInstanceState:Bundle?) { super.onCreate(savedInstanceState); db=Database(this); keyguardManager=getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+  window.decorView.systemUiVisibility = window.decorView.systemUiVisibility and (android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE).inv()
+  if (android.os.Build.VERSION.SDK_INT >= 30) window.setDecorFitsSystemWindows(false)
   registerReceiver(object:android.content.BroadcastReceiver(){ override fun onReceive(context:Context?, intent:Intent?) { lockedSinceAuth=true;unlocked=false } },android.content.IntentFilter(Intent.ACTION_SCREEN_OFF))
   checkActivation() }
  private fun authenticate() {
@@ -179,7 +181,21 @@ class MainActivity: Activity() {
  private fun screen(title:String):LinearLayout {
   currentPage=when(title) { "YellowKunde" -> "list"; tr("Opzioni") -> "options"; tr("Sicurezza"),tr("Informazioni sull’app") -> "suboptions"; tr("Nuovo cliente"),tr("Modifica cliente") -> "edit"; else -> "detail" }
   root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(18),dp(22),dp(18),dp(20));setBackgroundColor(Color.rgb(249,249,247))}
-  val scroll=ScrollView(this);scroll.addView(root);setContentView(scroll)
+  val scroll=ScrollView(this)
+  // Respect the real system-bar insets on Pixel and Samsung, including display cutouts.
+  scroll.setOnApplyWindowInsetsListener { view, insets ->
+   val top:Int; val bottom:Int
+   if (android.os.Build.VERSION.SDK_INT >= 30) {
+    val bars=insets.getInsets(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.displayCutout() or android.view.WindowInsets.Type.navigationBars())
+    top=bars.top;bottom=bars.bottom
+   } else {
+    top=insets.systemWindowInsetTop;bottom=insets.systemWindowInsetBottom
+   }
+   view.setPadding(0,top,0,bottom)
+   insets
+  }
+  scroll.clipToPadding=false
+  scroll.addView(root);setContentView(scroll)
   if(title!="YellowKunde") root.addView(TextView(this).apply{text=title;textSize=25f;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;setPadding(0,0,0,dp(18))})
   return root
  }
@@ -390,7 +406,26 @@ class MainActivity: Activity() {
   root.addView(button(tr("← Elenco clienti")){showList()})
   val actionFields=setOf("telefono_principale","telefono_secondario","email_principale","email_secondaria")
   fields.forEachIndexed { index,key ->
-   if(key !in actionFields) root.addView(TextView(this).apply { text="${if(key in infoKeys) infoLabel(key) else tr(captions[index])}: ${if(key in infoKeys) (if(customer[key].equals("true",true) || customer[key]=="1") "☑" else "☐") else customer[key].orEmpty()}";textSize=16f;setPadding(0,5,0,5) })
+   if (key in infoKeys) {
+    root.addView(android.widget.CheckBox(this).apply {
+     text=infoLabel(key)
+     textSize=16f
+     isChecked=customer[key].equals("true",true) || customer[key]=="1"
+     setOnCheckedChangeListener { check,checked ->
+      check.isEnabled=false
+      try {
+       db.setCustomerInfo(code,key,checked)
+       check.isEnabled=true
+      } catch(e:Exception) {
+       check.setOnCheckedChangeListener(null)
+       check.isChecked=!checked
+       check.isEnabled=true
+       Toast.makeText(this@MainActivity,e.message ?: "Errore salvataggio",Toast.LENGTH_LONG).show()
+       detail(code)
+      }
+     }
+    })
+   } else if(key !in actionFields) root.addView(TextView(this).apply { text="${tr(captions[index])}: ${customer[key].orEmpty()}";textSize=16f;setPadding(0,5,0,5) })
   }
   listOf("telefono_principale","telefono_secondario").forEach { key ->
    val number=customer[key].orEmpty().trim()

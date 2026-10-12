@@ -268,7 +268,19 @@ class MainActivity: Activity() {
   if(navPage!=null) {
    val shell=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.WHITE)}
    shell.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
-   shell.addView(bottomNavigation(navPage))
+   val bottomNav = bottomNavigation(navPage)
+    bottomNav.setOnApplyWindowInsetsListener { view, insets ->
+    val bottom = if (android.os.Build.VERSION.SDK_INT >= 30) {
+        insets.getInsets(
+            android.view.WindowInsets.Type.navigationBars()
+        ).bottom
+    } else {
+        insets.systemWindowInsetBottom
+    }
+    view.setPadding(dp(8), dp(6), dp(8), dp(6) + bottom)
+    insets
+}
+shell.addView(bottomNav)
    setContentView(shell)
   } else setContentView(scroll)
   if(title!="YellowKunde" && title!="Home") root.addView(TextView(this).apply{text=title;textSize=25f;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;setPadding(0,0,0,dp(18))})

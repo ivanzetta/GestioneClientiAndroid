@@ -7,11 +7,17 @@ import java.time.LocalDate
 
 val fields = listOf("codice", "nome", "indirizzo", "cap", "citta", "provincia", "zona", "settore", "contatto_principale", "telefono_principale", "email_principale", "contatto_secondario", "telefono_secondario", "email_secondaria", "info1", "info2", "info3", "info4", "info5", "note")
 val captions = listOf("Codice cliente", "Nome", "Indirizzo", "CAP", "Città", "Provincia", "Zona", "Settore", "Contatto principale", "Telefono principale", "Email principale", "Contatto secondario", "Telefono secondario", "Email secondaria", "Info1", "Info2", "Info3", "Info4", "Info5", "Note")
-class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 3) {
+class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 4) {
  override fun onCreate(db: SQLiteDatabase) {
   db.execSQL("CREATE TABLE clienti (codice TEXT PRIMARY KEY, nome TEXT NOT NULL DEFAULT '', indirizzo TEXT NOT NULL DEFAULT '', cap TEXT NOT NULL DEFAULT '', citta TEXT NOT NULL DEFAULT '', provincia TEXT NOT NULL DEFAULT '', zona TEXT NOT NULL DEFAULT '', settore TEXT NOT NULL DEFAULT '', contatto_principale TEXT NOT NULL DEFAULT '', telefono_principale TEXT NOT NULL DEFAULT '', email_principale TEXT NOT NULL DEFAULT '', contatto_secondario TEXT NOT NULL DEFAULT '', telefono_secondario TEXT NOT NULL DEFAULT '', email_secondaria TEXT NOT NULL DEFAULT '', info1 TEXT NOT NULL DEFAULT 'false', info2 TEXT NOT NULL DEFAULT 'false', info3 TEXT NOT NULL DEFAULT 'false', info4 TEXT NOT NULL DEFAULT 'false', info5 TEXT NOT NULL DEFAULT 'false', note TEXT NOT NULL DEFAULT '')")
   db.execSQL("CREATE TABLE visite (id INTEGER PRIMARY KEY AUTOINCREMENT, codice TEXT NOT NULL REFERENCES clienti(codice) ON DELETE CASCADE, data TEXT NOT NULL)")
   db.execSQL("CREATE INDEX idx_visite_cliente ON visite(codice, data)")
+  createPlans(db)
+ }
+ private fun createPlans(db:SQLiteDatabase) {
+  db.execSQL("CREATE TABLE IF NOT EXISTS attivita (id INTEGER PRIMARY KEY AUTOINCREMENT, codice TEXT NOT NULL REFERENCES clienti(codice) ON UPDATE CASCADE ON DELETE CASCADE, tipo TEXT NOT NULL CHECK(tipo IN ('visita','contatto','giro')), data TEXT, note TEXT NOT NULL DEFAULT '', posizione INTEGER NOT NULL DEFAULT 0, completata INTEGER NOT NULL DEFAULT 0)")
+  db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_attivita_aperte ON attivita(codice,tipo) WHERE tipo IN ('visita','contatto') AND completata=0")
+  db.execSQL("CREATE INDEX IF NOT EXISTS idx_attivita_data ON attivita(data,posizione)")
  }
  override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
  override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -23,6 +29,7 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
    db.execSQL("ALTER TABLE clienti ADD COLUMN cap TEXT NOT NULL DEFAULT ''")
    for(i in 1..5) db.execSQL("ALTER TABLE clienti ADD COLUMN info$i TEXT NOT NULL DEFAULT 'false'")
   }
+  if(oldVersion < 4) createPlans(db)
  }
  fun setCustomerInfo(code:String,key:String,checked:Boolean) {
   require(key in (1..5).map { "info$it" }) { "Campo Info non valido" }
@@ -86,6 +93,7 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
     require(!db.rawQuery("SELECT 1 FROM clienti WHERE codice=?", arrayOf(code)).use { it.moveToFirst() }) { "Codice già esistente" }
     db.insertOrThrow("clienti", null, cv)
     db.execSQL("UPDATE visite SET codice=? WHERE codice=?", arrayOf(code, oldCode))
+    db.execSQL("UPDATE attivita SET codice=? WHERE codice=?", arrayOf(code, oldCode))
     require(db.delete("clienti", "codice=?", arrayOf(oldCode)) == 1)
    } else if (oldCode != null) {
     require(db.update("clienti", cv, "codice=?", arrayOf(code)) == 1) { "Cliente non trovato" }
@@ -148,6 +156,39 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
    sql.setTransactionSuccessful()
   } finally { sql.endTransaction() }
  }
+
+ data class Task(val id:Long,val code:String,val name:String,val type:String,val date:String?,val notes:String,val position:Int,val done:Boolean)
+ fun tasks(type:String?=null,date:String?=null,openOnly:Boolean=true):List<Task> {
+  val where=mutableListOf<String>();val args=mutableListOf<String>()
+  if(type!=null){where.add("a.tipo=?");args.add(type)}
+  if(date!=null){where.add("a.data=?");args.add(date)}
+  if(openOnly)where.add("a.completata=0")
+  val filter=if(where.isEmpty()) "" else "WHERE "+where.joinToString(" AND ")
+  val out=mutableListOf<Task>()
+  readableDatabase.rawQuery("SELECT a.id,a.codice,c.nome,a.tipo,a.data,a.note,a.posizione,a.completata FROM attivita a JOIN clienti c ON c.codice=a.codice $filter ORDER BY CASE WHEN a.data IS NULL THEN 1 ELSE 0 END,a.data,a.posizione,a.id",args.toTypedArray()).use { c ->
+   while(c.moveToNext())out.add(Task(c.getLong(0),c.getString(1),c.getString(2),c.getString(3),if(c.isNull(4))null else c.getString(4),c.getString(5),c.getInt(6),c.getInt(7)!=0))
+  }
+  return out
+ }
+ fun saveTask(code:String,type:String,date:String?,notes:String):Boolean {
+  require(type=="visita" || type=="contatto")
+  val cv=android.content.ContentValues().apply {put("codice",code);put("tipo",type);put("data",date);put("note",notes);put("completata",0)}
+  val existing=readableDatabase.rawQuery("SELECT id FROM attivita WHERE codice=? AND tipo=? AND completata=0",arrayOf(code,type)).use { if(it.moveToFirst()) it.getLong(0) else null }
+  if(existing!=null) writableDatabase.update("attivita",cv,"id=?",arrayOf(existing.toString())) else writableDatabase.insertOrThrow("attivita",null,cv)
+  return existing!=null
+ }
+ fun addDayClient(code:String,date:String,notes:String="") {
+  val already=readableDatabase.rawQuery("SELECT 1 FROM attivita WHERE codice=? AND tipo='giro' AND data=? AND completata=0",arrayOf(code,date)).use {it.moveToFirst()}
+  require(!already){"Cliente già presente in questo giro"}
+  val next=readableDatabase.rawQuery("SELECT COALESCE(MAX(posizione),0)+1 FROM attivita WHERE tipo='giro' AND data=?",arrayOf(date)).use{it.moveToFirst();it.getInt(0)}
+  val cv=android.content.ContentValues().apply{put("codice",code);put("tipo","giro");put("data",date);put("note",notes);put("posizione",next)}
+  writableDatabase.insertOrThrow("attivita",null,cv)
+ }
+ fun completeTask(id:Long){writableDatabase.execSQL("UPDATE attivita SET completata=1 WHERE id=?",arrayOf(id))}
+ fun removeTask(id:Long){writableDatabase.delete("attivita","id=?",arrayOf(id.toString()))}
+ fun changeTaskNote(id:Long,note:String){val cv=android.content.ContentValues().apply{put("note",note)};writableDatabase.update("attivita",cv,"id=?",arrayOf(id.toString()))}
+ fun swapDayTasks(a:Task,b:Task){val db=writableDatabase;db.beginTransaction();try{db.execSQL("UPDATE attivita SET posizione=? WHERE id=?",arrayOf(b.position,a.id));db.execSQL("UPDATE attivita SET posizione=? WHERE id=?",arrayOf(a.position,b.id));db.setTransactionSuccessful()}finally{db.endTransaction()}}
+
  fun history(code:String):String {
   val years= mutableListOf<String>()
   readableDatabase.rawQuery("SELECT substr(data,1,4),COUNT(*) FROM visite WHERE codice=? GROUP BY substr(data,1,4) ORDER BY 1 DESC",arrayOf(code)).use{c->while(c.moveToNext())years.add("${c.getString(0)}: ${c.getInt(1)} visite")}

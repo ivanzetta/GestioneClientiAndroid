@@ -57,6 +57,7 @@ class MainActivity: Activity() {
   dialog.show()
  }
  private var currentPage="list"
+ private var selectedDay=LocalDate.now()
  private var editingCustomerCode:String?=null
  private var editingFields:Map<String,EditText> = emptyMap()
  private var originalValues:Map<String,String> = emptyMap()
@@ -68,7 +69,7 @@ class MainActivity: Activity() {
  private fun formatDate(value:String):String = runCatching { LocalDate.parse(value).format(displayDate) }.getOrDefault(value)
  private fun pickDate(initial:LocalDate=LocalDate.now(), onPicked:(LocalDate)->Unit) {
   DatePickerDialog(this,{ _,year,month,day -> onPicked(LocalDate.of(year,month+1,day)) },initial.year,initial.monthValue-1,initial.dayOfMonth).apply {
-   datePicker.maxDate=System.currentTimeMillis()
+   // Dates in the planning screens may be in the future.
   }.show()
  }
 
@@ -179,7 +180,7 @@ class MainActivity: Activity() {
   background=shape(Color.WHITE,Color.rgb(223,199,137))
  }
  private fun screen(title:String):LinearLayout {
-  currentPage=when(title) { "YellowKunde" -> "list"; tr("Opzioni") -> "options"; tr("Sicurezza"),tr("Informazioni sull’app") -> "suboptions"; tr("Nuovo cliente"),tr("Modifica cliente") -> "edit"; else -> "detail" }
+  currentPage=when(title) { "YellowKunde" -> "list"; "Pianifica giornata" -> "day"; "Attività" -> "tasks"; tr("Opzioni") -> "options"; tr("Sicurezza"),tr("Informazioni sull’app") -> "suboptions"; tr("Nuovo cliente"),tr("Modifica cliente") -> "edit"; else -> "detail" }
   root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(18),dp(22),dp(18),dp(20));setBackgroundColor(Color.rgb(249,249,247))}
   val scroll=ScrollView(this)
   // Respect the real system-bar insets on Pixel and Samsung, including display cutouts.
@@ -216,6 +217,23 @@ class MainActivity: Activity() {
   header.addView(homeIconAction(R.drawable.ic_home_sort,"Ordina clienti") { sortAction() })
   header.addView(homeIconAction(R.drawable.ic_home_settings,"Opzioni") { saveListPosition(scroll);showOptions() })
   root.addView(header)
+  val dashboard=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+  root.addView(dashboard)
+  val counts=db.tasks().groupingBy{it.type}.eachCount()
+  val summary=TextView(this).apply{text="Clienti: ${db.allCustomers().size}    Visite: ${counts["visita"]?:0}    Contatti: ${counts["contatto"]?:0}";textSize=15f;setTextColor(ink);setPadding(dp(8),dp(12),dp(8),dp(12));background=shape(Color.rgb(255,247,216))}
+  dashboard.addView(summary)
+  dashboard.addView(button("📅  Pianifica giornata") {saveListPosition(scroll);showDay()})
+  val actions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
+  val visits=secondaryButton("Visite (${counts["visita"]?:0})"){showTasks("visita")}
+  val contacts=secondaryButton("Da contattare (${counts["contatto"]?:0})"){showTasks("contatto")}
+  actions.addView(visits,LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f))
+  actions.addView(contacts,LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f))
+  dashboard.addView(actions)
+  val today=db.tasks(date=LocalDate.now().toString())
+  if(today.isNotEmpty())dashboard.addView(secondaryButton("Attività di oggi (${today.size})"){showDay(LocalDate.now())})
+  val extra=secondaryButton("Altre funzioni  ▾"){showOptions()}
+  dashboard.addView(extra)
+  heading("Elenco clienti")
   searchBar=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL;visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE }
   val searchRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
   val search=EditText(this).apply{hint=tr("Cerca codice, nome, città, settore, zona");setSingleLine(true);setText(q);textSize=14f;setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_home_search,0,0,0);compoundDrawablePadding=dp(7)}
@@ -281,6 +299,79 @@ class MainActivity: Activity() {
 
  private fun heading(label:String) {
   root.addView(TextView(this).apply { text=label; textSize=19f; setPadding(0,22,0,8) })
+ }
+ private fun editTask(code:String,type:String) {
+  val current=db.tasks(type).firstOrNull{it.code==code}
+  val note=EditText(this).apply{hint="Note";setText(current?.notes.orEmpty());minLines=3}
+  var date=current?.date
+  val wrapper=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(20),dp(8),dp(20),0)}
+  val dateButton=Button(this).apply{text="Data: "+(date?.let{formatDate(it)}?:"da definire")}
+  dateButton.setOnClickListener {pickDate(date?.let{LocalDate.parse(it)}?:LocalDate.now()){chosen->date=chosen.toString();dateButton.text="Data: "+formatDate(date!!)}}
+  wrapper.addView(dateButton)
+  wrapper.addView(secondaryButton("Rimuovi data"){date=null;dateButton.text="Data: da definire"})
+  wrapper.addView(note)
+  AlertDialog.Builder(this).setTitle(if(type=="visita")"Pianifica visita" else "Da contattare").setView(wrapper)
+   .setNegativeButton("Annulla",null)
+   .setNeutralButton("Calendario"){_,_->saveTaskAndCalendar(code,type,date,note.text.toString())}
+   .setPositiveButton("Salva"){_,_->db.saveTask(code,type,date,note.text.toString());detail(code)}.show()
+ }
+ private fun saveTaskAndCalendar(code:String,type:String,date:String?,note:String){
+  db.saveTask(code,type,date,note)
+  val customer=db.get(code)
+  if(date==null){Toast.makeText(this,"Seleziona una data per il calendario",Toast.LENGTH_LONG).show();detail(code);return}
+  val day=LocalDate.parse(date)
+  val start=day.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+  val intent=Intent(Intent.ACTION_INSERT).setData(CalendarContract.Events.CONTENT_URI)
+   .putExtra(CalendarContract.Events.TITLE,(if(type=="visita")"Visita" else "Contattare")+" - "+customer?.get("nome"))
+   .putExtra(CalendarContract.Events.DESCRIPTION,note)
+   .putExtra(CalendarContract.Events.ALL_DAY,true)
+   .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME,start)
+   .putExtra(CalendarContract.EXTRA_EVENT_END_TIME,day.plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli())
+  openExternal(intent);detail(code)
+ }
+ private fun showTasks(type:String){
+  screen("Attività")
+  root.addView(button("← Home"){showList()})
+  heading(if(type=="visita")"Visite da pianificare" else "Da contattare")
+  db.tasks(type).forEach {task->
+   root.addView(secondaryButton(task.name+" · "+(task.date?.let{formatDate(it)}?:"Senza data")+"\n"+task.notes){detail(task.code)})
+   root.addView(button("✓ Completato: "+task.name){db.completeTask(task.id);showTasks(type)})
+  }
+ }
+ private fun showDay(day:LocalDate=selectedDay){
+  selectedDay=day;screen("Pianifica giornata")
+  root.addView(button("← Home"){showList()})
+  root.addView(button("Data: "+formatDate(day.toString())){pickDate(day){showDay(it)}})
+  root.addView(button("+ Aggiungi cliente"){
+   val clients=db.allCustomers()
+   val names=clients.map{it["nome"].orEmpty()+" · "+it["codice"].orEmpty()}.toTypedArray()
+   AlertDialog.Builder(this).setTitle("Scegli cliente").setItems(names){_,index->
+    val code=clients[index]["codice"].orEmpty()
+    try{db.addDayClient(code,day.toString());showDay(day)}catch(e:Exception){Toast.makeText(this,e.message,Toast.LENGTH_LONG).show()}
+   }.setNegativeButton("Annulla",null).show()
+  })
+  val items=db.tasks("giro",day.toString())
+  items.forEachIndexed{index,task->
+   root.addView(secondaryButton("${index+1}. ${task.name}\n${task.notes}"){detail(task.code)})
+   val row=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
+   fun small(text:String,action:()->Unit){row.addView(Button(this).apply{this.text=text;isAllCaps=false;setOnClickListener{action()}},LinearLayout.LayoutParams(0,dp(50),1f))}
+   small("↑"){if(index>0){db.swapDayTasks(task,items[index-1]);showDay(day)}}
+   small("↓"){if(index<items.lastIndex){db.swapDayTasks(task,items[index+1]);showDay(day)}}
+   small("Note"){val input=EditText(this).apply{setText(task.notes)};AlertDialog.Builder(this).setTitle("Note visita").setView(input).setNegativeButton("Annulla",null).setPositiveButton("Salva"){_,_->db.changeTaskNote(task.id,input.text.toString());showDay(day)}.show()}
+   small("✓"){db.completeTask(task.id);showDay(day)}
+   small("×"){db.removeTask(task.id);showDay(day)}
+   root.addView(row)
+  }
+  root.addView(button("Aggiungi giro al calendario"){
+   val start=day.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+   val description=items.mapIndexed{index,task->"${index+1}. ${task.name}: ${task.notes}"}.joinToString("\n")
+   openExternal(Intent(Intent.ACTION_INSERT).setData(CalendarContract.Events.CONTENT_URI)
+    .putExtra(CalendarContract.Events.TITLE,"Giro clienti YellowKunde")
+    .putExtra(CalendarContract.Events.DESCRIPTION,description)
+    .putExtra(CalendarContract.Events.ALL_DAY,true)
+    .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME,start)
+    .putExtra(CalendarContract.EXTRA_EVENT_END_TIME,day.plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()))
+  })
  }
  private fun showOptions() {
   screen(tr("Opzioni"))
@@ -492,13 +583,16 @@ class MainActivity: Activity() {
     }.setNegativeButton(tr("Annulla"),null).show()
   })
   root.addView(button(tr("Annulla ultima visita")) {AlertDialog.Builder(this).setMessage(tr("Eliminare l'ultima visita registrata?")).setPositiveButton(tr("Sì")){_,_->db.undoLastVisit(code);detail(code)}.setNegativeButton(tr("No"),null).show()})
+  heading("Promemoria cliente")
+  root.addView(secondaryButton("Pianifica visita (con note)"){editTask(code,"visita")})
+  root.addView(secondaryButton("Da contattare (con note)"){editTask(code,"contatto")})
   root.addView(button(tr("Modifica cliente")){edit(code)})
   root.addView(button(tr("Elimina cliente")) {AlertDialog.Builder(this).setMessage(tr("Eliminare definitivamente questo cliente e tutte le visite?")).setPositiveButton(tr("Elimina")){_,_->db.delete(code);showList()}.setNegativeButton(tr("Annulla"),null).show()})
  }
  @Deprecated("Android back navigation")
  override fun onBackPressed() {
   when(currentPage) {
-   "options", "detail" -> showList()
+   "options", "detail", "tasks", "day" -> showList()
    "suboptions" -> showOptions()
    "edit" -> {
     val changed=editingFields.any { (key,field) -> field.text.toString() != (originalValues[key] ?: "") }

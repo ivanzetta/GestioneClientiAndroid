@@ -73,7 +73,7 @@ jobs:
           jarsigner -verify "$SIGNED_AAB"
           echo "AAB firmato e verificato."
 
-           - name: Upload Signed AAB
+      - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
         with:
           name: YellowKunde-AAB-Release-Firmato

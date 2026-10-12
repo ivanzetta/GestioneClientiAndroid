@@ -84,7 +84,7 @@ class MainActivity: Activity() {
   window.decorView.systemUiVisibility = window.decorView.systemUiVisibility and (android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE).inv()
   if (android.os.Build.VERSION.SDK_INT >= 30) window.setDecorFitsSystemWindows(false)
   registerReceiver(object:android.content.BroadcastReceiver(){ override fun onReceive(context:Context?, intent:Intent?) { lockedSinceAuth=true;unlocked=false } },android.content.IntentFilter(Intent.ACTION_SCREEN_OFF))
-  checkActivation() }
+  authenticate() }
  private fun authenticate() {
   if (unlocked || prompting) return
   val km=getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
@@ -115,7 +115,7 @@ class MainActivity: Activity() {
   })
  }
  override fun onStop() { super.onStop() }
- override fun onStart() { super.onStart(); if (hasStarted && ::db.isInitialized && (!unlocked || lockedSinceAuth || keyguardManager.isKeyguardLocked)) { unlocked=false;checkActivation() }; hasStarted=true }
+ override fun onStart() { super.onStart(); if (hasStarted && ::db.isInitialized && (!unlocked || lockedSinceAuth || keyguardManager.isKeyguardLocked)) { unlocked=false;authenticate() }; hasStarted=true }
  private val brandYellow=Color.rgb(250,179,0)
  private val ink=Color.rgb(34,34,34)
  private fun dp(n:Int):Int=(n*resources.displayMetrics.density).toInt()

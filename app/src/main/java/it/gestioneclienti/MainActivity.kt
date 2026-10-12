@@ -127,7 +127,7 @@ class MainActivity: Activity() {
  }
  private fun button(label:String, action:()->Unit):Button = Button(this).apply {
   text=label;isAllCaps=false;textSize=16f;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD
-  background=shape(brandYellow);minHeight=dp(50);setPadding(dp(14),dp(9),dp(14),dp(9))
+  background=shape(Color.WHITE,Color.rgb(233,230,219));minHeight=dp(46);setPadding(dp(12),dp(8),dp(12),dp(8))
   val params=LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT)
   params.setMargins(0,dp(5),0,dp(5));layoutParams=params
   setOnClickListener{action()}
@@ -179,6 +179,7 @@ class MainActivity: Activity() {
   row.addView(TextView(this).apply { text="${tr(label)}: $value";textSize=16f;setTextColor(ink);layoutParams=LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f) })
   row.addView(iconButton(symbol,label,action));root.addView(row)
  }
+ private fun primaryButton(label:String, action:()->Unit):Button=button(label,action).apply { background=shape(Color.rgb(255,216,91)) }
  private fun secondaryButton(label:String, action:()->Unit):Button=button(label,action).apply {
   background=shape(Color.WHITE,softBorder)
  }
@@ -194,7 +195,7 @@ class MainActivity: Activity() {
    orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER
    setPadding(dp(8),dp(6),dp(8),dp(6));setBackgroundColor(Color.WHITE)
   }
-  listOf(Triple("⌂","Home","home"),Triple("♟","Clienti","clients"),Triple("⚙","Opzioni","options")).forEach { (symbol,label,key) ->
+  listOf(Triple("⌂","Home","home"),Triple("♟","Clienti","clients"),Triple("▣","Pianifica","day"),Triple("⚙","Opzioni","options")).forEach { (symbol,label,key) ->
    val item=LinearLayout(this).apply {
     orientation=LinearLayout.VERTICAL;gravity=android.view.Gravity.CENTER
     setPadding(dp(5),dp(8),dp(5),dp(8))
@@ -203,7 +204,7 @@ class MainActivity: Activity() {
    }
    item.addView(homeText(symbol,24f,true,if(active==key)Color.rgb(190,131,0) else ink).apply {gravity=android.view.Gravity.CENTER})
    item.addView(homeText(label,13f,active==key).apply {gravity=android.view.Gravity.CENTER})
-   item.setOnClickListener { when(key) { "home"->showHome(); "clients"->showList(""); else->showOptions() } }
+   item.setOnClickListener { when(key) { "home"->showHome(); "clients"->showList(""); "day"->showDay(); else->showOptions() } }
    nav.addView(item,LinearLayout.LayoutParams(0,dp(66),1f))
   }
   return nav
@@ -212,10 +213,12 @@ class MainActivity: Activity() {
   screen("Home")
   root.setPadding(dp(14),dp(12),dp(14),dp(24))
   val header=homeCard(Color.rgb(255,212,63))
-  header.addView(homeText("YellowKunde     ●●●",27f,true,Color.BLACK))
+  header.addView(homeText("YellowKunde",27f,true,Color.BLACK))
   header.addView(homeText("Gestione clienti",15f,false,Color.rgb(85,70,30)))
   root.addView(header,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=dp(15)})
-  root.addView(homeText("Riepilogo attività",22f,true))
+  root.addView(homeText("Benvenuto!",22f,true))
+  root.addView(homeText("Ecco la tua giornata di oggi.",14f,false,Color.DKGRAY))
+  root.addView(homeText("Riepilogo attività",18f,true))
   val now=LocalDate.now()
   val tasks=db.tasks().filter { it.type=="visita" || it.type=="contatto" }
   val rows=listOf(listOf("▣","Visite oggi","visita","today"),listOf("▣","Visite future","visita","future"),listOf("☎","Contatti oggi","contatto","today"),listOf("☎","Contatti futuri","contatto","future"))
@@ -267,7 +270,7 @@ class MainActivity: Activity() {
   }
   scroll.clipToPadding=false
   scroll.addView(root)
-  val navPage=when(title){"Home"->"home";"YellowKunde"->"clients";tr("Opzioni")->"options";else->null}
+  val navPage=when(title){"Home"->"home";"YellowKunde"->"clients";"Pianifica giornata"->"day";tr("Opzioni")->"options";else->null}
   if(navPage!=null) {
    val shell=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.WHITE)}
    shell.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
@@ -443,21 +446,39 @@ shell.addView(bottomNav)
  }
  private fun showTasks(type:String,period:String?=null){
   screen("Attività")
-  root.addView(button("← Home"){showHome()})
+  root.addView(secondaryButton("← Home"){showHome()})
   heading(if(type=="visita")"Visite" else "Da contattare")
   val today=LocalDate.now().toString()
   db.tasks(type).filter {task-> when(period){"today"->task.date!=null && task.date<=today;"future"->task.date!=null && task.date>today;else->true} }.forEach {task->
    val overdue=task.date!=null && task.date<today
    val prefix=if(overdue)"⚠ SCADUTA · " else ""
    root.addView(secondaryButton(prefix+task.name+" · "+(task.date?.let{formatDate(it)}?:"Senza data")+"\n"+task.notes){detail(task.code)})
-   root.addView(button("✓ Completato: "+task.name){confirmCompletion(task){showTasks(type,period)}})
+   val actions=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
+   fun action(label:String,primary:Boolean,run:()->Unit) {
+    val b=if(primary) primaryButton(label,run) else secondaryButton(label,run)
+    actions.addView(b,LinearLayout.LayoutParams(0,dp(48),1f).apply { marginEnd=dp(5) })
+   }
+   action(if(type=="visita")"✓ Conferma visita" else "✓ Completato",true) {
+    if(type=="visita") AlertDialog.Builder(this).setTitle("Conferma visita")
+     .setMessage("Confermi che la visita a ${task.name} è stata effettuata?")
+     .setNegativeButton("Torna indietro",null)
+     .setPositiveButton("Conferma"){_,_->db.completeDayVisit(task.id,task.date ?: today);showTasks(type,period)}.show()
+    else confirmCompletion(task){showTasks(type,period)}
+   }
+   if(type=="visita") action("× Annulla visita",false) {
+    AlertDialog.Builder(this).setTitle("Annullare questa visita?")
+     .setMessage("La visita programmata verrà eliminata definitivamente.")
+     .setNegativeButton("Torna indietro",null)
+     .setPositiveButton("Elimina visita"){_,_->db.cancelDayVisit(task.id,task.date ?: today);showTasks(type,period)}.show()
+   }
+   root.addView(actions)
   }
  }
  private fun showDay(day:LocalDate=selectedDay){
   selectedDay=day;screen("Pianifica giornata")
   root.addView(button("← Home"){showHome()})
-  root.addView(button("Data: "+formatDate(day.toString())){pickDate(day){showDay(it)}})
-  root.addView(button("+ Aggiungi cliente"){
+  root.addView(secondaryButton("Data: "+formatDate(day.toString())){pickDate(day){showDay(it)}})
+  root.addView(primaryButton("+ Aggiungi cliente"){
    val clients=db.allCustomers()
    val names=clients.map{it["nome"].orEmpty()+" · "+it["codice"].orEmpty()}.toTypedArray()
    AlertDialog.Builder(this).setTitle("Scegli cliente").setItems(names){_,index->
@@ -479,7 +500,7 @@ shell.addView(bottomNav)
    val row=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
    fun small(text:String,action:()->Unit){row.addView(Button(this).apply{
     this.text=text;isAllCaps=false;textSize=13f;setTextColor(ink)
-    background=shape(paleYellow,softBorder);setOnClickListener{action()}
+    background=shape(if(text.startsWith("✓"))Color.rgb(255,216,91) else Color.WHITE,softBorder);setOnClickListener{action()}
    },LinearLayout.LayoutParams(0,dp(48),1f).apply {marginEnd=dp(4)})}
    if(task.type=="giro") {
     val manualItems=manual.filter { it.code !in scheduledCodes }
@@ -488,11 +509,11 @@ shell.addView(bottomNav)
     small("↓"){if(manualIndex>=0 && manualIndex<manualItems.lastIndex){db.swapDayTasks(task,manualItems[manualIndex+1]);showDay(day)}}
    }
    small("Note"){val input=EditText(this).apply{setText(task.notes)};AlertDialog.Builder(this).setTitle("Note visita").setView(input).setNegativeButton("Annulla",null).setPositiveButton("Salva"){_,_->db.changeTaskNote(task.id,input.text.toString());showDay(day)}.show()}
-   small("✓ Conferma"){AlertDialog.Builder(this).setTitle("Conferma visita").setMessage("Confermi che la visita a ${task.name} è stata effettuata?").setNegativeButton("Indietro",null).setPositiveButton("Conferma"){_,_->db.completeDayVisit(task.id,day.toString());showDay(day)}.show()}
-   small("× Annulla"){AlertDialog.Builder(this).setTitle("Annullare questa visita?").setMessage("La visita programmata verrà eliminata definitivamente, senza registrarla nello storico.").setNegativeButton("Torna indietro",null).setPositiveButton("Elimina visita"){_,_->db.cancelDayVisit(task.id,day.toString());showDay(day)}.show()}
+   small("✓ Conferma visita"){AlertDialog.Builder(this).setTitle("Conferma visita").setMessage("Confermi che la visita a ${task.name} è stata effettuata?").setNegativeButton("Indietro",null).setPositiveButton("Conferma"){_,_->db.completeDayVisit(task.id,day.toString());showDay(day)}.show()}
+   small("× Annulla visita"){AlertDialog.Builder(this).setTitle("Annullare questa visita?").setMessage("La visita programmata verrà eliminata definitivamente, senza registrarla nello storico.").setNegativeButton("Torna indietro",null).setPositiveButton("Elimina visita"){_,_->db.cancelDayVisit(task.id,day.toString());showDay(day)}.show()}
    root.addView(row)
   }
-  root.addView(button("Aggiungi giro al calendario"){
+  root.addView(secondaryButton("Aggiungi giro al calendario"){
    val start=day.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
    val description=items.mapIndexed{index,task->"${index+1}. ${task.name}: ${task.notes}"}.joinToString("\n")
    openExternal(Intent(Intent.ACTION_INSERT).setData(CalendarContract.Events.CONTENT_URI)
@@ -506,12 +527,12 @@ shell.addView(bottomNav)
 
  private fun showOptions() {
   screen(tr("Opzioni"))
-  root.addView(button("← " + tr("Indietro")){showList()})
+  root.addView(secondaryButton("← " + tr("Indietro")){showHome()})
   heading(tr("Importazione ed esportazione Excel"))
-  root.addView(button(tr("Importa Excel .xlsx")) {
+  root.addView(secondaryButton(tr("Importa Excel .xlsx")) {
    startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply { type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";addCategory(Intent.CATEGORY_OPENABLE) },importRequest)
   })
-  root.addView(button(tr("Esporta Excel .xlsx")) {
+  root.addView(secondaryButton(tr("Esporta Excel .xlsx")) {
    AlertDialog.Builder(this).setTitle(tr("Attenzione ai dati personali"))
     .setMessage(tr("Il file Excel non è cifrato e contiene dati dei clienti. Conservalo in una posizione protetta e non condividerlo senza autorizzazione."))
     .setNegativeButton(tr("Annulla"), null)
@@ -520,13 +541,13 @@ shell.addView(bottomNav)
     }.show()
   })
   heading(tr("Backup e ripristino"))
-  root.addView(button(tr("Crea backup cifrato")) {
+  root.addView(secondaryButton(tr("Crea backup cifrato")) {
    askBackupPassword(tr("Password per il backup (minimo 12 caratteri)")) { password ->
     backupPassword=password
     startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply { type="application/octet-stream";putExtra(Intent.EXTRA_TITLE,"clienti.gcbk");addCategory(Intent.CATEGORY_OPENABLE) },backupRequest)
    }
   })
-  root.addView(button(tr("Ripristina backup cifrato")) {
+  root.addView(secondaryButton(tr("Ripristina backup cifrato")) {
    AlertDialog.Builder(this).setTitle(tr("Ripristino completo"))
     .setMessage(tr("Il ripristino SOSTITUIRÀ tutti i clienti e tutte le visite presenti. Assicurati di avere una copia di sicurezza."))
     .setNegativeButton(tr("Annulla"),null).setPositiveButton(tr("Continua")) { _,_ ->
@@ -538,13 +559,13 @@ shell.addView(bottomNav)
   })
 
   heading("Personalizza campi Info")
-  root.addView(button("Modifica etichette Info1–Info5"){showInfoSettings()})
+  root.addView(secondaryButton("Modifica etichette Info1–Info5"){showInfoSettings()})
   heading(tr("Sicurezza"))
-  root.addView(button(tr("Sicurezza")){showSecurity()})
+  root.addView(secondaryButton(tr("Sicurezza")){showSecurity()})
   heading(tr("Lingua"))
-  root.addView(button(tr("Lingua") + " / Sprache"){chooseLanguage()})
+  root.addView(secondaryButton(tr("Lingua") + " / Sprache"){chooseLanguage()})
   heading(tr("Informazioni sull’app"))
-  root.addView(button(tr("Informazioni sull’app")){showAbout()})
+  root.addView(secondaryButton(tr("Informazioni sull’app")){showAbout()})
  }
  private fun showInfoSettings() {
   screen("Personalizza campi Info")

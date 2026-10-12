@@ -107,7 +107,7 @@ class MainActivity: Activity() {
    .build()
   prompt.authenticate(CancellationSignal(), mainExecutor, object:BiometricPrompt.AuthenticationCallback() {
    override fun onAuthenticationSucceeded(result:BiometricPrompt.AuthenticationResult) {
-    prompting=false;unlocked=true;lockedSinceAuth=false;showList()
+    prompting=false;unlocked=true;lockedSinceAuth=false;showHome()
    }
    override fun onAuthenticationError(errorCode:Int, errString:CharSequence) {
     prompting=false; if(!unlocked) finish()
@@ -179,8 +179,72 @@ class MainActivity: Activity() {
  private fun secondaryButton(label:String, action:()->Unit):Button=button(label,action).apply {
   background=shape(Color.WHITE,Color.rgb(223,199,137))
  }
+ private fun homeText(label:String,size:Float=16f,bold:Boolean=false,color:Int=ink):TextView =
+  TextView(this).apply { text=label;textSize=size;setTextColor(color)
+   if(bold)typeface=Typeface.DEFAULT_BOLD;gravity=android.view.Gravity.CENTER_VERTICAL }
+ private fun homeCard(color:Int):LinearLayout=LinearLayout(this).apply {
+  orientation=LinearLayout.VERTICAL;background=shape(color)
+  setPadding(dp(15),dp(16),dp(15),dp(16))
+ }
+ private fun bottomNavigation(active:String):LinearLayout {
+  val nav=LinearLayout(this).apply {
+   orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER
+   setPadding(dp(8),dp(6),dp(8),dp(6));setBackgroundColor(Color.WHITE)
+  }
+  listOf(Triple("⌂","Home","home"),Triple("♟","Clienti","clients"),Triple("⚙","Opzioni","options")).forEach { (symbol,label,key) ->
+   val item=LinearLayout(this).apply {
+    orientation=LinearLayout.VERTICAL;gravity=android.view.Gravity.CENTER
+    setPadding(dp(5),dp(8),dp(5),dp(8))
+    background=shape(if(active==key)Color.rgb(255,243,204) else Color.WHITE)
+    contentDescription=label
+   }
+   item.addView(homeText(symbol,24f,true,if(active==key)Color.rgb(190,131,0) else ink).apply {gravity=android.view.Gravity.CENTER})
+   item.addView(homeText(label,13f,active==key).apply {gravity=android.view.Gravity.CENTER})
+   item.setOnClickListener { when(key) { "home"->showHome(); "clients"->showList(""); else->showOptions() } }
+   nav.addView(item,LinearLayout.LayoutParams(0,dp(66),1f))
+  }
+  return nav
+ }
+ private fun showHome() {
+  screen("Home")
+  root.setPadding(dp(14),dp(12),dp(14),dp(24))
+  val header=homeCard(Color.rgb(255,212,63))
+  header.addView(homeText("YellowKunde     ●●●",27f,true,Color.BLACK))
+  header.addView(homeText("Gestione clienti",15f,false,Color.rgb(85,70,30)))
+  root.addView(header,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=dp(15)})
+  val search=homeCard(Color.rgb(239,240,242))
+  search.addView(homeText("⌕   Cerca cliente...                       ☷",17f,false,Color.DKGRAY))
+  search.setOnClickListener {showList("")}
+  root.addView(search,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=dp(18)})
+  root.addView(homeText("Riepilogo attività",22f,true))
+  val counts=db.tasks().groupingBy{it.type}.eachCount()
+  val tiles=LinearLayout(this).apply {orientation=LinearLayout.HORIZONTAL}
+  listOf(Triple("▣","Visite", "visita"),Triple("☎","Da contattare","contatto")).forEachIndexed { i,(symbol,label,type) ->
+   val card=homeCard(if(i==0)Color.rgb(255,246,218) else Color.rgb(225,241,255)).apply {
+    gravity=android.view.Gravity.CENTER
+    addView(homeText(symbol,31f,true,if(i==0)Color.rgb(220,155,0) else Color.rgb(34,107,190)).apply{gravity=android.view.Gravity.CENTER})
+    addView(homeText("${counts[type]?:0}",31f,true).apply{gravity=android.view.Gravity.CENTER})
+    addView(homeText(label,16f,true).apply{gravity=android.view.Gravity.CENTER})
+    addView(homeText(if(i==0)"Da effettuare" else "In sospeso",13f,false,Color.DKGRAY).apply{gravity=android.view.Gravity.CENTER})
+    setOnClickListener{showTasks(type)}
+   }
+   tiles.addView(card,LinearLayout.LayoutParams(0,dp(158),1f).apply {marginStart=if(i==0)0 else dp(5);marginEnd=if(i==0)dp(5) else 0})
+  }
+  root.addView(tiles,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(12);bottomMargin=dp(18)})
+  val day=homeCard(Color.rgb(230,246,237))
+  day.addView(homeText("⌁   Pianifica giornata     ›",19f,true,Color.rgb(0,93,67)))
+  day.addView(homeText("      Organizza il giro clienti senza orari",13f,false,Color.DKGRAY))
+  day.setOnClickListener{showDay()}
+  root.addView(day,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(18)})
+  root.addView(homeText("Clienti",22f,true))
+  val clients=homeCard(Color.WHITE).apply {background=shape(Color.WHITE,Color.rgb(225,225,225))}
+  clients.addView(homeText("♟   Elenco clienti                 ›",18f,true))
+  clients.addView(homeText("      Cerca, aggiungi e gestisci i tuoi clienti",13f,false,Color.DKGRAY))
+  clients.setOnClickListener{showList("")}
+  root.addView(clients,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(12)})
+ }
  private fun screen(title:String):LinearLayout {
-  currentPage=when(title) { "YellowKunde" -> "list"; "Pianifica giornata" -> "day"; "Attività" -> "tasks"; tr("Opzioni") -> "options"; tr("Sicurezza"),tr("Informazioni sull’app") -> "suboptions"; tr("Nuovo cliente"),tr("Modifica cliente") -> "edit"; else -> "detail" }
+  currentPage=when(title) { "YellowKunde" -> "list"; "Home" -> "home"; "Pianifica giornata" -> "day"; "Attività" -> "tasks"; tr("Opzioni") -> "options"; tr("Sicurezza"),tr("Informazioni sull’app") -> "suboptions"; tr("Nuovo cliente"),tr("Modifica cliente") -> "edit"; else -> "detail" }
   root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(18),dp(22),dp(18),dp(20));setBackgroundColor(Color.rgb(249,249,247))}
   val scroll=ScrollView(this)
   // Respect the real system-bar insets on Pixel and Samsung, including display cutouts.
@@ -196,8 +260,15 @@ class MainActivity: Activity() {
    insets
   }
   scroll.clipToPadding=false
-  scroll.addView(root);setContentView(scroll)
-  if(title!="YellowKunde") root.addView(TextView(this).apply{text=title;textSize=25f;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;setPadding(0,0,0,dp(18))})
+  scroll.addView(root)
+  val navPage=when(title){"Home"->"home";"YellowKunde"->"clients";tr("Opzioni")->"options";else->null}
+  if(navPage!=null) {
+   val shell=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.WHITE)}
+   shell.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
+   shell.addView(bottomNavigation(navPage))
+   setContentView(shell)
+  } else setContentView(scroll)
+  if(title!="YellowKunde" && title!="Home") root.addView(TextView(this).apply{text=title;textSize=25f;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;setPadding(0,0,0,dp(18))})
   return root
  }
  private val selectedZones=mutableSetOf<String>()
@@ -592,7 +663,9 @@ class MainActivity: Activity() {
  @Deprecated("Android back navigation")
  override fun onBackPressed() {
   when(currentPage) {
-   "options", "detail", "tasks", "day" -> showList()
+   "options" -> showHome()
+   "list" -> showHome()
+   "detail", "tasks", "day" -> showList()
    "suboptions" -> showOptions()
    "edit" -> {
     val changed=editingFields.any { (key,field) -> field.text.toString() != (originalValues[key] ?: "") }

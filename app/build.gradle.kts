@@ -1,6 +1,6 @@
 plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
-android { namespace = "it.gestioneclienti"; compileSdk = 35
- defaultConfig { applicationId = "it.gestioneclienti"; minSdk = 26; targetSdk = 35; versionCode = 17; versionName = "0.9.4" } 
+android { namespace = "it.gestioneclienti"; compileSdk = 36
+ defaultConfig { applicationId = "it.gestioneclienti"; minSdk = 26; targetSdk = 36; versionCode = 18; versionName = "0.9.4" } 
 
 compileOptions {
     sourceCompatibility = JavaVersion.VERSION_17

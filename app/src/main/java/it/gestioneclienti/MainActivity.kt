@@ -481,6 +481,12 @@ shell.addView(bottomNav)
     this.text=text;isAllCaps=false;textSize=13f;setTextColor(ink)
     background=shape(paleYellow,softBorder);setOnClickListener{action()}
    },LinearLayout.LayoutParams(0,dp(48),1f).apply {marginEnd=dp(4)})}
+   if(task.type=="giro") {
+    val manualItems=manual.filter { it.code !in scheduledCodes }
+    val manualIndex=manualItems.indexOfFirst { it.id==task.id }
+    small("↑"){if(manualIndex>0){db.swapDayTasks(task,manualItems[manualIndex-1]);showDay(day)}}
+    small("↓"){if(manualIndex>=0 && manualIndex<manualItems.lastIndex){db.swapDayTasks(task,manualItems[manualIndex+1]);showDay(day)}}
+   }
    small("Note"){val input=EditText(this).apply{setText(task.notes)};AlertDialog.Builder(this).setTitle("Note visita").setView(input).setNegativeButton("Annulla",null).setPositiveButton("Salva"){_,_->db.changeTaskNote(task.id,input.text.toString());showDay(day)}.show()}
    small("✓ Conferma"){AlertDialog.Builder(this).setTitle("Conferma visita").setMessage("Confermi che la visita a ${task.name} è stata effettuata?").setNegativeButton("Indietro",null).setPositiveButton("Conferma"){_,_->db.completeDayVisit(task.id,day.toString());showDay(day)}.show()}
    small("× Annulla"){AlertDialog.Builder(this).setTitle("Annullare questa visita?").setMessage("La visita programmata verrà eliminata definitivamente, senza registrarla nello storico.").setNegativeButton("Torna indietro",null).setPositiveButton("Elimina visita"){_,_->db.cancelDayVisit(task.id,day.toString());showDay(day)}.show()}

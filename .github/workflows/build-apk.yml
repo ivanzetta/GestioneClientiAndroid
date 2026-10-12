@@ -50,7 +50,7 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
-                - name: Sign Release AAB
+      - name: Sign Release AAB
         env:
           KEYSTORE_BASE64: ${{ secrets.YELLOWKUNDE_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.YELLOWKUNDE_KEYSTORE_PASSWORD }}

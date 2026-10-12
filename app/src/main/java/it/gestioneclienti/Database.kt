@@ -184,7 +184,22 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
   val cv=android.content.ContentValues().apply{put("codice",code);put("tipo","giro");put("data",date);put("note",notes);put("posizione",next)}
   writableDatabase.insertOrThrow("attivita",null,cv)
  }
- fun completeTask(id:Long){writableDatabase.execSQL("UPDATE attivita SET completata=1 WHERE id=?",arrayOf(id))}
+ fun completeTask(id:Long){
+  val sql=writableDatabase
+  sql.beginTransaction()
+  try {
+   sql.rawQuery("SELECT codice,tipo FROM attivita WHERE id=? AND completata=0",arrayOf(id.toString())).use { c ->
+    if(c.moveToFirst()) {
+     val code=c.getString(0);val type=c.getString(1)
+     val values=android.content.ContentValues().apply {put("completata",1)}
+     if(sql.update("attivita",values,"id=? AND completata=0",arrayOf(id.toString()))==1 && (type=="visita" || type=="giro")) {
+      sql.execSQL("INSERT INTO visite(codice,data) VALUES(?,?)",arrayOf(code,LocalDate.now().toString()))
+     }
+    }
+   }
+   sql.setTransactionSuccessful()
+  } finally {sql.endTransaction()}
+ }
  fun removeTask(id:Long){writableDatabase.delete("attivita","id=?",arrayOf(id.toString()))}
  fun changeTaskNote(id:Long,note:String){val cv=android.content.ContentValues().apply{put("note",note)};writableDatabase.update("attivita",cv,"id=?",arrayOf(id.toString()))}
  fun swapDayTasks(a:Task,b:Task){val db=writableDatabase;db.beginTransaction();try{db.execSQL("UPDATE attivita SET posizione=? WHERE id=?",arrayOf(b.position,a.id));db.execSQL("UPDATE attivita SET posizione=? WHERE id=?",arrayOf(a.position,b.id));db.setTransactionSuccessful()}finally{db.endTransaction()}}

@@ -212,25 +212,28 @@ class MainActivity: Activity() {
   header.addView(homeText("YellowKunde     ●●●",27f,true,Color.BLACK))
   header.addView(homeText("Gestione clienti",15f,false,Color.rgb(85,70,30)))
   root.addView(header,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=dp(15)})
-  val search=homeCard(Color.rgb(239,240,242))
-  search.addView(homeText("⌕   Cerca cliente...                       ☷",17f,false,Color.DKGRAY))
-  search.setOnClickListener {showList("")}
-  root.addView(search,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=dp(18)})
   root.addView(homeText("Riepilogo attività",22f,true))
-  val counts=db.tasks().groupingBy{it.type}.eachCount()
-  val tiles=LinearLayout(this).apply {orientation=LinearLayout.HORIZONTAL}
-  listOf(Triple("▣","Visite", "visita"),Triple("☎","Da contattare","contatto")).forEachIndexed { i,(symbol,label,type) ->
-   val card=homeCard(if(i==0)Color.rgb(255,246,218) else Color.rgb(225,241,255)).apply {
-    gravity=android.view.Gravity.CENTER
-    addView(homeText(symbol,31f,true,if(i==0)Color.rgb(220,155,0) else Color.rgb(34,107,190)).apply{gravity=android.view.Gravity.CENTER})
-    addView(homeText("${counts[type]?:0}",31f,true).apply{gravity=android.view.Gravity.CENTER})
-    addView(homeText(label,16f,true).apply{gravity=android.view.Gravity.CENTER})
-    addView(homeText(if(i==0)"Da effettuare" else "In sospeso",13f,false,Color.DKGRAY).apply{gravity=android.view.Gravity.CENTER})
-    setOnClickListener{showTasks(type)}
+  val now=LocalDate.now()
+  val tasks=db.tasks().filter { it.type=="visita" || it.type=="contatto" }
+  val rows=listOf(listOf("▣","Visite oggi","visita","today"),listOf("▣","Visite future","visita","future"),listOf("☎","Contatti oggi","contatto","today"),listOf("☎","Contatti futuri","contatto","future"))
+  rows.chunked(2).forEach { pair ->
+   val tiles=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
+   pair.forEachIndexed { i,info ->
+    val type=info[2];val period=info[3]
+    val matching=tasks.filter { it.type==type && it.date!=null && (if(period=="today") it.date<=now.toString() else it.date>now.toString()) }
+    val overdue=matching.count { it.date!!<now.toString() }
+    val card=homeCard(if(type=="visita")Color.rgb(255,246,218) else Color.rgb(225,241,255)).apply {
+     gravity=android.view.Gravity.CENTER
+     addView(homeText(info[0],25f,true).apply{gravity=android.view.Gravity.CENTER})
+     addView(homeText("${matching.size}",29f,true).apply{gravity=android.view.Gravity.CENTER})
+     addView(homeText(info[1],15f,true).apply{gravity=android.view.Gravity.CENTER})
+     if(overdue>0)addView(homeText("⚠ $overdue scadute",12f,true,Color.rgb(180,40,30)).apply{gravity=android.view.Gravity.CENTER})
+     setOnClickListener { showTasks(type,period) }
+    }
+    tiles.addView(card,LinearLayout.LayoutParams(0,dp(145),1f).apply { marginStart=if(i==0)0 else dp(5);marginEnd=if(i==0)dp(5) else 0 })
    }
-   tiles.addView(card,LinearLayout.LayoutParams(0,dp(158),1f).apply {marginStart=if(i==0)0 else dp(5);marginEnd=if(i==0)dp(5) else 0})
+   root.addView(tiles,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(9);bottomMargin=dp(5)})
   }
-  root.addView(tiles,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(12);bottomMargin=dp(18)})
   val day=homeCard(Color.rgb(230,246,237))
   day.addView(homeText("⌁   Pianifica giornata     ›",19f,true,Color.rgb(0,93,67)))
   day.addView(homeText("      Organizza il giro clienti senza orari",13f,false,Color.DKGRAY))
@@ -288,22 +291,6 @@ class MainActivity: Activity() {
   header.addView(homeIconAction(R.drawable.ic_home_sort,"Ordina clienti") { sortAction() })
   header.addView(homeIconAction(R.drawable.ic_home_settings,"Opzioni") { saveListPosition(scroll);showOptions() })
   root.addView(header)
-  val dashboard=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
-  root.addView(dashboard)
-  val counts=db.tasks().groupingBy{it.type}.eachCount()
-  val summary=TextView(this).apply{text="Clienti: ${db.allCustomers().size}    Visite: ${counts["visita"]?:0}    Contatti: ${counts["contatto"]?:0}";textSize=15f;setTextColor(ink);setPadding(dp(8),dp(12),dp(8),dp(12));background=shape(Color.rgb(255,247,216))}
-  dashboard.addView(summary)
-  dashboard.addView(button("📅  Pianifica giornata") {saveListPosition(scroll);showDay()})
-  val actions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
-  val visits=secondaryButton("Visite (${counts["visita"]?:0})"){showTasks("visita")}
-  val contacts=secondaryButton("Da contattare (${counts["contatto"]?:0})"){showTasks("contatto")}
-  actions.addView(visits,LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f))
-  actions.addView(contacts,LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f))
-  dashboard.addView(actions)
-  val today=db.tasks(date=LocalDate.now().toString())
-  if(today.isNotEmpty())dashboard.addView(secondaryButton("Attività di oggi (${today.size})"){showDay(LocalDate.now())})
-  val extra=secondaryButton("Altre funzioni  ▾"){showOptions()}
-  dashboard.addView(extra)
   heading("Elenco clienti")
   searchBar=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL;visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE }
   val searchRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
@@ -335,9 +322,19 @@ class MainActivity: Activity() {
    list.removeAllViews()
    val sort=prefs.getString("sort_key","name") ?: "name"
    val descending=prefs.getBoolean("sort_desc",false)
+   val pending=db.tasks().filter { it.type=="visita" || it.type=="contatto" }.groupBy { it.code }
+   val today=LocalDate.now().toString()
    db.sortedList(listSearch,sort,descending).forEach{(code,name)->
     if(selectedZones.isEmpty() || db.get(code)?.get("zona")?.trim() in selectedZones) {
-     list.addView(secondaryButton("$name  ·  $code"){saveListPosition(scroll);detail(code)})
+     val flags=pending[code].orEmpty().map { task ->
+      val label=if(task.type=="visita") "Visita" else "Chiamata"
+      when {task.date==null -> "$label da programmare";task.date<today -> "⚠ $label scaduta (${formatDate(task.date)})";task.date==today -> "$label oggi";else -> "$label ${formatDate(task.date)}"}
+     }
+     val text=if(flags.isEmpty()) "$name  ·  $code" else "$name  ·  $code\n"+flags.joinToString("   •   ")
+     val item=secondaryButton(text){saveListPosition(scroll);detail(code)}
+     if(flags.any { it.contains("scaduta") })item.setTextColor(Color.rgb(180,40,30))
+     else if(flags.isNotEmpty())item.setTextColor(Color.rgb(25,99,160))
+     list.addView(item)
     }
    }
   }
@@ -400,13 +397,25 @@ class MainActivity: Activity() {
    .putExtra(CalendarContract.EXTRA_EVENT_END_TIME,day.plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli())
   openExternal(intent);detail(code)
  }
- private fun showTasks(type:String){
+ private fun confirmCompletion(task:Database.Task,after:()->Unit) {
+  val isVisit=task.type=="visita" || task.type=="giro"
+  AlertDialog.Builder(this)
+   .setTitle("Conferma completamento")
+   .setMessage(if(isVisit)"Confermi che la visita a ${task.name} è stata effettuata? Verrà registrata nello storico visite." else "Confermi che il contatto con ${task.name} è stato effettuato?")
+   .setNegativeButton("Annulla",null)
+   .setPositiveButton("Conferma"){_,_->db.completeTask(task.id);after()}
+   .show()
+ }
+ private fun showTasks(type:String,period:String?=null){
   screen("Attività")
-  root.addView(button("← Home"){showList()})
-  heading(if(type=="visita")"Visite da pianificare" else "Da contattare")
-  db.tasks(type).forEach {task->
-   root.addView(secondaryButton(task.name+" · "+(task.date?.let{formatDate(it)}?:"Senza data")+"\n"+task.notes){detail(task.code)})
-   root.addView(button("✓ Completato: "+task.name){db.completeTask(task.id);showTasks(type)})
+  root.addView(button("← Home"){showHome()})
+  heading(if(type=="visita")"Visite" else "Da contattare")
+  val today=LocalDate.now().toString()
+  db.tasks(type).filter {task-> when(period){"today"->task.date!=null && task.date<=today;"future"->task.date!=null && task.date>today;else->true} }.forEach {task->
+   val overdue=task.date!=null && task.date<today
+   val prefix=if(overdue)"⚠ SCADUTA · " else ""
+   root.addView(secondaryButton(prefix+task.name+" · "+(task.date?.let{formatDate(it)}?:"Senza data")+"\n"+task.notes){detail(task.code)})
+   root.addView(button("✓ Completato: "+task.name){confirmCompletion(task){showTasks(type,period)}})
   }
  }
  private fun showDay(day:LocalDate=selectedDay){
@@ -429,7 +438,7 @@ class MainActivity: Activity() {
    small("↑"){if(index>0){db.swapDayTasks(task,items[index-1]);showDay(day)}}
    small("↓"){if(index<items.lastIndex){db.swapDayTasks(task,items[index+1]);showDay(day)}}
    small("Note"){val input=EditText(this).apply{setText(task.notes)};AlertDialog.Builder(this).setTitle("Note visita").setView(input).setNegativeButton("Annulla",null).setPositiveButton("Salva"){_,_->db.changeTaskNote(task.id,input.text.toString());showDay(day)}.show()}
-   small("✓"){db.completeTask(task.id);showDay(day)}
+   small("✓"){confirmCompletion(task){showDay(day)}}
    small("×"){db.removeTask(task.id);showDay(day)}
    root.addView(row)
   }
@@ -633,6 +642,11 @@ class MainActivity: Activity() {
   root.addView(TextView(this).apply {
    text=if(isGerman()) "Besuche ${LocalDate.now().year}: $count\nLetzter Besuch: ${formatDate(last)}\n\nVerlauf:\n$visitHistory" else "Visite ${LocalDate.now().year}: $count\nUltima visita: ${formatDate(last)}\n\nStorico:\n$visitHistory"
    textSize=17f;setPadding(0,15,0,15)
+  })
+  val completed=db.tasks(openOnly=false).filter { it.code==code && it.done && it.notes.isNotBlank() }
+  if(completed.isNotEmpty())root.addView(TextView(this).apply {
+   text="Note attività completate:\n"+completed.joinToString("\n") { "• "+(if(it.type=="contatto")"Telefonata" else "Visita")+": "+it.notes }
+   textSize=15f;setPadding(0,dp(8),0,dp(12))
   })
   root.addView(button(tr("Registra visita (oggi)")){db.visit(code);detail(code)})
   root.addView(button(tr("Registra visita dal calendario")) {

@@ -50,6 +50,29 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
+                - name: Sign Release AAB
+        env:
+          KEYSTORE_BASE64: ${{ secrets.YELLOWKUNDE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.YELLOWKUNDE_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.YELLOWKUNDE_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.YELLOWKUNDE_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/yellowkunde-upload.jks"
+
+          AAB="app/build/outputs/bundle/release/app-release.aab"
+          SIGNED_AAB="app/build/outputs/bundle/release/YellowKunde-0.9.4-signed.aab"
+
+          jarsigner \
+            -keystore "$RUNNER_TEMP/yellowkunde-upload.jks" \
+            -storepass:env KEYSTORE_PASSWORD \
+            -keypass:env KEY_PASSWORD \
+            -signedjar "$SIGNED_AAB" \
+            "$AAB" "$KEY_ALIAS"
+
+          jarsigner -verify "$SIGNED_AAB"
+          echo "AAB firmato e verificato."
+
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:

@@ -118,6 +118,9 @@ class MainActivity: Activity() {
  override fun onStart() { super.onStart(); if (hasStarted && ::db.isInitialized && (!unlocked || lockedSinceAuth || keyguardManager.isKeyguardLocked)) { unlocked=false;authenticate() }; hasStarted=true }
  private val brandYellow=Color.rgb(250,179,0)
  private val ink=Color.rgb(34,34,34)
+ private val warmBackground=Color.rgb(249,249,247)
+ private val softBorder=Color.rgb(223,199,137)
+ private val paleYellow=Color.rgb(255,246,218)
  private fun dp(n:Int):Int=(n*resources.displayMetrics.density).toInt()
  private fun shape(color:Int,stroke:Int?=null):GradientDrawable=GradientDrawable().apply {
   setColor(color);cornerRadius=dp(14).toFloat();if(stroke!=null)setStroke(dp(1),stroke)
@@ -177,7 +180,7 @@ class MainActivity: Activity() {
   row.addView(iconButton(symbol,label,action));root.addView(row)
  }
  private fun secondaryButton(label:String, action:()->Unit):Button=button(label,action).apply {
-  background=shape(Color.WHITE,Color.rgb(223,199,137))
+  background=shape(Color.WHITE,softBorder)
  }
  private fun homeText(label:String,size:Float=16f,bold:Boolean=false,color:Int=ink):TextView =
   TextView(this).apply { text=label;textSize=size;setTextColor(color)
@@ -248,7 +251,7 @@ class MainActivity: Activity() {
  }
  private fun screen(title:String):LinearLayout {
   currentPage=when(title) { "YellowKunde" -> "list"; "Home" -> "home"; "Pianifica giornata" -> "day"; "Attività" -> "tasks"; tr("Opzioni") -> "options"; tr("Sicurezza"),tr("Informazioni sull’app") -> "suboptions"; tr("Nuovo cliente"),tr("Modifica cliente") -> "edit"; else -> "detail" }
-  root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(18),dp(22),dp(18),dp(20));setBackgroundColor(Color.rgb(249,249,247))}
+  root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(16),dp(14),dp(24));setBackgroundColor(warmBackground)}
   val scroll=ScrollView(this)
   // Respect the real system-bar insets on Pixel and Samsung, including display cutouts.
   scroll.setOnApplyWindowInsetsListener { view, insets ->
@@ -283,7 +286,7 @@ class MainActivity: Activity() {
 shell.addView(bottomNav)
    setContentView(shell)
   } else setContentView(scroll)
-  if(title!="YellowKunde" && title!="Home") root.addView(TextView(this).apply{text=title;textSize=25f;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;setPadding(0,0,0,dp(18))})
+  if(title!="YellowKunde" && title!="Home") root.addView(homeCard(Color.rgb(255,212,63)).apply { addView(homeText(title,24f,true,Color.BLACK)) })
   return root
  }
  private val selectedZones=mutableSetOf<String>()
@@ -294,12 +297,12 @@ shell.addView(bottomNav)
  private fun showList(q:String=listSearch) {
   listSearch=q
   screen("YellowKunde")
-  root.setPadding(dp(10),dp(22),dp(10),dp(20))
+  root.setPadding(dp(14),dp(12),dp(14),dp(24))
   val scroll=root.parent as ScrollView
   lateinit var searchBar:LinearLayout
   lateinit var sortAction:()->Unit
   val header=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
-  header.addView(TextView(this).apply { text="YellowKunde";textSize=19f;setSingleLine(true);ellipsize=android.text.TextUtils.TruncateAt.END;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;layoutParams=LinearLayout.LayoutParams(0,dp(44),1f);gravity=android.view.Gravity.CENTER_VERTICAL })
+  header.addView(TextView(this).apply { text="YellowKunde";textSize=23f;setSingleLine(true);ellipsize=android.text.TextUtils.TruncateAt.END;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;layoutParams=LinearLayout.LayoutParams(0,dp(44),1f);gravity=android.view.Gravity.CENTER_VERTICAL })
   header.addView(homeIconAction(R.drawable.ic_home_add,"Nuovo cliente") { saveListPosition(scroll);edit(null) })
   header.addView(homeIconAction(R.drawable.ic_home_filter,"Filtri") { listFiltersVisible=!listFiltersVisible;searchBar.visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE })
   header.addView(homeIconAction(R.drawable.ic_home_sort,"Ordina clienti") { sortAction() })
@@ -398,7 +401,7 @@ shell.addView(bottomNav)
  private fun saveListPosition(scroll:ScrollView) { listScrollY=scroll.scrollY }
 
  private fun heading(label:String) {
-  root.addView(TextView(this).apply { text=label; textSize=19f; setPadding(0,22,0,8) })
+  root.addView(TextView(this).apply { text=label; textSize=21f;typeface=Typeface.DEFAULT_BOLD;setTextColor(ink);setPadding(0,dp(16),0,dp(10)) })
  }
  private fun editTask(code:String,type:String) {
   val current=db.tasks(type).firstOrNull{it.code==code}
@@ -468,13 +471,16 @@ shell.addView(bottomNav)
   val scheduledCodes=scheduled.map { it.code }.toSet()
   val items=scheduled+manual.filter { it.code !in scheduledCodes }
   heading("Visite da effettuare · "+items.size)
-  if(items.isEmpty())root.addView(secondaryButton("Nessuna visita da effettuare per questa data"){})
+  if(items.isEmpty())root.addView(homeCard(paleYellow).apply { addView(homeText("Nessuna visita da effettuare per questa data")) })
   items.forEachIndexed{index,task->
    val overdue=task.date!=null && task.date<day.toString() && task.type=="visita"
    val label=if(task.type=="visita") (if(overdue)"⚠ Visita scaduta · " else "Visita programmata · ") +formatDate(task.date.orEmpty()) else "Aggiunta al giro"
    root.addView(secondaryButton("${index+1}. ${task.name}\n${label}\n${task.notes}"){detail(task.code)})
    val row=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
-   fun small(text:String,action:()->Unit){row.addView(Button(this).apply{this.text=text;isAllCaps=false;setOnClickListener{action()}},LinearLayout.LayoutParams(0,dp(50),1f))}
+   fun small(text:String,action:()->Unit){row.addView(Button(this).apply{
+    this.text=text;isAllCaps=false;textSize=13f;setTextColor(ink)
+    background=shape(paleYellow,softBorder);setOnClickListener{action()}
+   },LinearLayout.LayoutParams(0,dp(48),1f).apply {marginEnd=dp(4)})}
    small("Note"){val input=EditText(this).apply{setText(task.notes)};AlertDialog.Builder(this).setTitle("Note visita").setView(input).setNegativeButton("Annulla",null).setPositiveButton("Salva"){_,_->db.changeTaskNote(task.id,input.text.toString());showDay(day)}.show()}
    small("✓ Conferma"){AlertDialog.Builder(this).setTitle("Conferma visita").setMessage("Confermi che la visita a ${task.name} è stata effettuata?").setNegativeButton("Indietro",null).setPositiveButton("Conferma"){_,_->db.completeDayVisit(task.id,day.toString());showDay(day)}.show()}
    small("× Annulla"){AlertDialog.Builder(this).setTitle("Annullare questa visita?").setMessage("La visita programmata verrà eliminata definitivamente, senza registrarla nello storico.").setNegativeButton("Torna indietro",null).setPositiveButton("Elimina visita"){_,_->db.cancelDayVisit(task.id,day.toString());showDay(day)}.show()}

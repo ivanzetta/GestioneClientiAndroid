@@ -118,13 +118,16 @@ class MainActivity: Activity() {
  override fun onStart() { super.onStart(); if (hasStarted && ::db.isInitialized && (!unlocked || lockedSinceAuth || keyguardManager.isKeyguardLocked)) { unlocked=false;authenticate() }; hasStarted=true }
  private val brandYellow=Color.rgb(250,179,0)
  private val ink=Color.rgb(34,34,34)
+ private val warmBackground=Color.rgb(249,249,247)
+ private val softBorder=Color.rgb(223,199,137)
+ private val paleYellow=Color.rgb(255,246,218)
  private fun dp(n:Int):Int=(n*resources.displayMetrics.density).toInt()
  private fun shape(color:Int,stroke:Int?=null):GradientDrawable=GradientDrawable().apply {
   setColor(color);cornerRadius=dp(14).toFloat();if(stroke!=null)setStroke(dp(1),stroke)
  }
  private fun button(label:String, action:()->Unit):Button = Button(this).apply {
   text=label;isAllCaps=false;textSize=16f;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD
-  background=shape(brandYellow);minHeight=dp(50);setPadding(dp(14),dp(9),dp(14),dp(9))
+  background=shape(Color.WHITE,Color.rgb(233,230,219));minHeight=dp(46);setPadding(dp(12),dp(8),dp(12),dp(8))
   val params=LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT)
   params.setMargins(0,dp(5),0,dp(5));layoutParams=params
   setOnClickListener{action()}
@@ -176,8 +179,9 @@ class MainActivity: Activity() {
   row.addView(TextView(this).apply { text="${tr(label)}: $value";textSize=16f;setTextColor(ink);layoutParams=LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f) })
   row.addView(iconButton(symbol,label,action));root.addView(row)
  }
+ private fun primaryButton(label:String, action:()->Unit):Button=button(label,action).apply { background=shape(Color.rgb(255,216,91)) }
  private fun secondaryButton(label:String, action:()->Unit):Button=button(label,action).apply {
-  background=shape(Color.WHITE,Color.rgb(223,199,137))
+  background=shape(Color.WHITE,softBorder)
  }
  private fun homeText(label:String,size:Float=16f,bold:Boolean=false,color:Int=ink):TextView =
   TextView(this).apply { text=label;textSize=size;setTextColor(color)
@@ -191,7 +195,7 @@ class MainActivity: Activity() {
    orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER
    setPadding(dp(8),dp(6),dp(8),dp(6));setBackgroundColor(Color.WHITE)
   }
-  listOf(Triple("⌂","Home","home"),Triple("♟","Clienti","clients"),Triple("⚙","Opzioni","options")).forEach { (symbol,label,key) ->
+  listOf(Triple("⌂","Home","home"),Triple("♟","Clienti","clients"),Triple("▣","Pianifica","day"),Triple("⚙","Opzioni","options")).forEach { (symbol,label,key) ->
    val item=LinearLayout(this).apply {
     orientation=LinearLayout.VERTICAL;gravity=android.view.Gravity.CENTER
     setPadding(dp(5),dp(8),dp(5),dp(8))
@@ -200,7 +204,7 @@ class MainActivity: Activity() {
    }
    item.addView(homeText(symbol,24f,true,if(active==key)Color.rgb(190,131,0) else ink).apply {gravity=android.view.Gravity.CENTER})
    item.addView(homeText(label,13f,active==key).apply {gravity=android.view.Gravity.CENTER})
-   item.setOnClickListener { when(key) { "home"->showHome(); "clients"->showList(""); else->showOptions() } }
+   item.setOnClickListener { when(key) { "home"->showHome(); "clients"->showList(""); "day"->showDay(); else->showOptions() } }
    nav.addView(item,LinearLayout.LayoutParams(0,dp(66),1f))
   }
   return nav
@@ -209,10 +213,12 @@ class MainActivity: Activity() {
   screen("Home")
   root.setPadding(dp(14),dp(12),dp(14),dp(24))
   val header=homeCard(Color.rgb(255,212,63))
-  header.addView(homeText("YellowKunde     ●●●",27f,true,Color.BLACK))
+  header.addView(homeText("YellowKunde",27f,true,Color.BLACK))
   header.addView(homeText("Gestione clienti",15f,false,Color.rgb(85,70,30)))
   root.addView(header,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=dp(15)})
-  root.addView(homeText("Riepilogo attività",22f,true))
+  root.addView(homeText("Benvenuto!",22f,true))
+  root.addView(homeText("Ecco la tua giornata di oggi.",14f,false,Color.DKGRAY))
+  root.addView(homeText("Riepilogo attività",18f,true))
   val now=LocalDate.now()
   val tasks=db.tasks().filter { it.type=="visita" || it.type=="contatto" }
   val rows=listOf(listOf("▣","Visite oggi","visita","today"),listOf("▣","Visite future","visita","future"),listOf("☎","Contatti oggi","contatto","today"),listOf("☎","Contatti futuri","contatto","future"))
@@ -248,7 +254,7 @@ class MainActivity: Activity() {
  }
  private fun screen(title:String):LinearLayout {
   currentPage=when(title) { "YellowKunde" -> "list"; "Home" -> "home"; "Pianifica giornata" -> "day"; "Attività" -> "tasks"; tr("Opzioni") -> "options"; tr("Sicurezza"),tr("Informazioni sull’app") -> "suboptions"; tr("Nuovo cliente"),tr("Modifica cliente") -> "edit"; else -> "detail" }
-  root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(18),dp(22),dp(18),dp(20));setBackgroundColor(Color.rgb(249,249,247))}
+  root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(16),dp(14),dp(24));setBackgroundColor(warmBackground)}
   val scroll=ScrollView(this)
   // Respect the real system-bar insets on Pixel and Samsung, including display cutouts.
   scroll.setOnApplyWindowInsetsListener { view, insets ->
@@ -264,7 +270,7 @@ class MainActivity: Activity() {
   }
   scroll.clipToPadding=false
   scroll.addView(root)
-  val navPage=when(title){"Home"->"home";"YellowKunde"->"clients";tr("Opzioni")->"options";else->null}
+  val navPage=when(title){"Home"->"home";"YellowKunde"->"clients";"Pianifica giornata"->"day";tr("Opzioni")->"options";else->null}
   if(navPage!=null) {
    val shell=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.WHITE)}
    shell.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
@@ -283,25 +289,26 @@ class MainActivity: Activity() {
 shell.addView(bottomNav)
    setContentView(shell)
   } else setContentView(scroll)
-  if(title!="YellowKunde" && title!="Home") root.addView(TextView(this).apply{text=title;textSize=25f;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;setPadding(0,0,0,dp(18))})
+  if(title!="YellowKunde" && title!="Home") root.addView(homeCard(Color.rgb(255,212,63)).apply { addView(homeText(title,24f,true,Color.BLACK)) })
   return root
  }
  private val selectedZones=mutableSetOf<String>()
+ private var selectedInfoField:String?=null
+ private var selectedInfoValue:Boolean=true
  private val sortLabels=listOf("Nome cliente","Codice cliente","Città","Zona","Settore","Data ultima visita","Numero visite annuali")
  private val sortKeys=listOf("name","code","city","zone","sector","visit","count")
  private fun showList(q:String=listSearch) {
   listSearch=q
   screen("YellowKunde")
-  root.setPadding(dp(10),dp(22),dp(10),dp(20))
+  root.setPadding(dp(14),dp(12),dp(14),dp(24))
   val scroll=root.parent as ScrollView
   lateinit var searchBar:LinearLayout
   lateinit var sortAction:()->Unit
   val header=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
-  header.addView(TextView(this).apply { text="YellowKunde";textSize=19f;setSingleLine(true);ellipsize=android.text.TextUtils.TruncateAt.END;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;layoutParams=LinearLayout.LayoutParams(0,dp(44),1f);gravity=android.view.Gravity.CENTER_VERTICAL })
+  header.addView(TextView(this).apply { text="YellowKunde";textSize=23f;setSingleLine(true);ellipsize=android.text.TextUtils.TruncateAt.END;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;layoutParams=LinearLayout.LayoutParams(0,dp(44),1f);gravity=android.view.Gravity.CENTER_VERTICAL })
   header.addView(homeIconAction(R.drawable.ic_home_add,"Nuovo cliente") { saveListPosition(scroll);edit(null) })
   header.addView(homeIconAction(R.drawable.ic_home_filter,"Filtri") { listFiltersVisible=!listFiltersVisible;searchBar.visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE })
   header.addView(homeIconAction(R.drawable.ic_home_sort,"Ordina clienti") { sortAction() })
-  header.addView(homeIconAction(R.drawable.ic_home_settings,"Opzioni") { saveListPosition(scroll);showOptions() })
   root.addView(header)
   heading("Elenco clienti")
   searchBar=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL;visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE }
@@ -315,9 +322,21 @@ shell.addView(bottomNav)
   updateZoneLabel()
   searchRow.addView(zoneAction)
   searchBar.addView(searchRow)
+  searchBar.addView(secondaryButton("Filtro Info1–Info5: "+(selectedInfoField?.let { infoLabel(it)+" = "+(if(selectedInfoValue)"Vero" else "Falso") } ?: "Nessuno")) {
+   val fields=(1..5).map { "info$it" }
+   val labels=fields.map { infoLabel(it) }.toTypedArray()
+   AlertDialog.Builder(this).setTitle("Filtra clienti per")
+    .setItems(labels){_,index->
+     val field=fields[index]
+     AlertDialog.Builder(this).setTitle(infoLabel(field))
+      .setItems(arrayOf("Vero","Falso")){_,which->selectedInfoField=field;selectedInfoValue=which==0;listScrollY=0;showList()}
+      .setNegativeButton("Annulla",null).show()
+    }.setNeutralButton("Cancella filtro"){_,_->selectedInfoField=null;listScrollY=0;showList()}
+     .setNegativeButton("Annulla",null).show()
+  })
   root.addView(searchBar)
   val resetAction=compactTextAction("×","Azzera filtri") {
-   listSearch="";listZone="";selectedZones.clear();listScrollY=0
+   listSearch="";listZone="";selectedZones.clear();selectedInfoField=null;listScrollY=0
    prefs.edit().putString("sort_key","name").putBoolean("sort_desc",false).apply();showList("")
   }
   // Reset remains accessible through the zone selector without taking a full row.
@@ -337,7 +356,14 @@ shell.addView(bottomNav)
    val pending=db.tasks().filter { it.type=="visita" || it.type=="contatto" }.groupBy { it.code }
    val today=LocalDate.now().toString()
    db.sortedList(listSearch,sort,descending).forEach{(code,name)->
-    if(selectedZones.isEmpty() || db.get(code)?.get("zona")?.trim() in selectedZones) {
+    val customer=db.get(code)
+    val zoneMatches=selectedZones.isEmpty() || customer?.get("zona")?.trim() in selectedZones
+    val infoMatches=selectedInfoField?.let { field ->
+     val value=customer?.get(field)?.trim().orEmpty()
+     val truthy=value.equals("true",true) || value=="1"
+     if(selectedInfoValue) truthy else !truthy
+    } ?: true
+    if(zoneMatches && infoMatches) {
      val flags=pending[code].orEmpty().map { task ->
       val label=if(task.type=="visita") "Visita" else "Chiamata"
       when {task.date==null -> "$label da programmare";task.date<today -> "⚠ $label scaduta (${formatDate(task.date)})";task.date==today -> "$label oggi";else -> "$label ${formatDate(task.date)}"}
@@ -378,7 +404,7 @@ shell.addView(bottomNav)
  private fun saveListPosition(scroll:ScrollView) { listScrollY=scroll.scrollY }
 
  private fun heading(label:String) {
-  root.addView(TextView(this).apply { text=label; textSize=19f; setPadding(0,22,0,8) })
+  root.addView(TextView(this).apply { text=label; textSize=21f;typeface=Typeface.DEFAULT_BOLD;setTextColor(ink);setPadding(0,dp(16),0,dp(10)) })
  }
  private fun editTask(code:String,type:String) {
   val current=db.tasks(type).firstOrNull{it.code==code}
@@ -420,21 +446,39 @@ shell.addView(bottomNav)
  }
  private fun showTasks(type:String,period:String?=null){
   screen("Attività")
-  root.addView(button("← Home"){showHome()})
+  root.addView(secondaryButton("← Home"){showHome()})
   heading(if(type=="visita")"Visite" else "Da contattare")
   val today=LocalDate.now().toString()
   db.tasks(type).filter {task-> when(period){"today"->task.date!=null && task.date<=today;"future"->task.date!=null && task.date>today;else->true} }.forEach {task->
    val overdue=task.date!=null && task.date<today
    val prefix=if(overdue)"⚠ SCADUTA · " else ""
    root.addView(secondaryButton(prefix+task.name+" · "+(task.date?.let{formatDate(it)}?:"Senza data")+"\n"+task.notes){detail(task.code)})
-   root.addView(button("✓ Completato: "+task.name){confirmCompletion(task){showTasks(type,period)}})
+   val actions=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
+   fun action(label:String,primary:Boolean,run:()->Unit) {
+    val b=if(primary) primaryButton(label,run) else secondaryButton(label,run)
+    actions.addView(b,LinearLayout.LayoutParams(0,dp(48),1f).apply { marginEnd=dp(5) })
+   }
+   action(if(type=="visita")"✓ Conferma visita" else "✓ Completato",true) {
+    if(type=="visita") AlertDialog.Builder(this).setTitle("Conferma visita")
+     .setMessage("Confermi che la visita a ${task.name} è stata effettuata?")
+     .setNegativeButton("Torna indietro",null)
+     .setPositiveButton("Conferma"){_,_->db.completeDayVisit(task.id,task.date ?: today);showTasks(type,period)}.show()
+    else confirmCompletion(task){showTasks(type,period)}
+   }
+   if(type=="visita") action("× Annulla visita",false) {
+    AlertDialog.Builder(this).setTitle("Annullare questa visita?")
+     .setMessage("La visita programmata verrà eliminata definitivamente.")
+     .setNegativeButton("Torna indietro",null)
+     .setPositiveButton("Elimina visita"){_,_->db.cancelDayVisit(task.id,task.date ?: today);showTasks(type,period)}.show()
+   }
+   root.addView(actions)
   }
  }
  private fun showDay(day:LocalDate=selectedDay){
   selectedDay=day;screen("Pianifica giornata")
-  root.addView(button("← Home"){showList()})
-  root.addView(button("Data: "+formatDate(day.toString())){pickDate(day){showDay(it)}})
-  root.addView(button("+ Aggiungi cliente"){
+  root.addView(button("← Home"){showHome()})
+  root.addView(secondaryButton("Data: "+formatDate(day.toString())){pickDate(day){showDay(it)}})
+  root.addView(primaryButton("+ Aggiungi cliente"){
    val clients=db.allCustomers()
    val names=clients.map{it["nome"].orEmpty()+" · "+it["codice"].orEmpty()}.toTypedArray()
    AlertDialog.Builder(this).setTitle("Scegli cliente").setItems(names){_,index->
@@ -442,19 +486,34 @@ shell.addView(bottomNav)
     try{db.addDayClient(code,day.toString());showDay(day)}catch(e:Exception){Toast.makeText(this,e.message,Toast.LENGTH_LONG).show()}
    }.setNegativeButton("Annulla",null).show()
   })
-  val items=db.tasks("giro",day.toString())
+  val manual=db.tasks("giro",day.toString())
+  val scheduled=db.tasks("visita").filter { it.date!=null && it.date<=day.toString() }
+  // A customer present in both lists must only appear once.
+  val scheduledCodes=scheduled.map { it.code }.toSet()
+  val items=scheduled+manual.filter { it.code !in scheduledCodes }
+  heading("Visite da effettuare · "+items.size)
+  if(items.isEmpty())root.addView(homeCard(paleYellow).apply { addView(homeText("Nessuna visita da effettuare per questa data")) })
   items.forEachIndexed{index,task->
-   root.addView(secondaryButton("${index+1}. ${task.name}\n${task.notes}"){detail(task.code)})
+   val overdue=task.date!=null && task.date<day.toString() && task.type=="visita"
+   val label=if(task.type=="visita") (if(overdue)"⚠ Visita scaduta · " else "Visita programmata · ") +formatDate(task.date.orEmpty()) else "Aggiunta al giro"
+   root.addView(secondaryButton("${index+1}. ${task.name}\n${label}\n${task.notes}"){detail(task.code)})
    val row=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
-   fun small(text:String,action:()->Unit){row.addView(Button(this).apply{this.text=text;isAllCaps=false;setOnClickListener{action()}},LinearLayout.LayoutParams(0,dp(50),1f))}
-   small("↑"){if(index>0){db.swapDayTasks(task,items[index-1]);showDay(day)}}
-   small("↓"){if(index<items.lastIndex){db.swapDayTasks(task,items[index+1]);showDay(day)}}
+   fun small(text:String,action:()->Unit){row.addView(Button(this).apply{
+    this.text=text;isAllCaps=false;textSize=13f;setTextColor(ink)
+    background=shape(if(text.startsWith("✓"))Color.rgb(255,216,91) else Color.WHITE,softBorder);setOnClickListener{action()}
+   },LinearLayout.LayoutParams(0,dp(48),1f).apply {marginEnd=dp(4)})}
+   if(task.type=="giro") {
+    val manualItems=manual.filter { it.code !in scheduledCodes }
+    val manualIndex=manualItems.indexOfFirst { it.id==task.id }
+    small("↑"){if(manualIndex>0){db.swapDayTasks(task,manualItems[manualIndex-1]);showDay(day)}}
+    small("↓"){if(manualIndex>=0 && manualIndex<manualItems.lastIndex){db.swapDayTasks(task,manualItems[manualIndex+1]);showDay(day)}}
+   }
    small("Note"){val input=EditText(this).apply{setText(task.notes)};AlertDialog.Builder(this).setTitle("Note visita").setView(input).setNegativeButton("Annulla",null).setPositiveButton("Salva"){_,_->db.changeTaskNote(task.id,input.text.toString());showDay(day)}.show()}
-   small("✓"){confirmCompletion(task){showDay(day)}}
-   small("×"){db.removeTask(task.id);showDay(day)}
+   small("✓ Conferma visita"){AlertDialog.Builder(this).setTitle("Conferma visita").setMessage("Confermi che la visita a ${task.name} è stata effettuata?").setNegativeButton("Indietro",null).setPositiveButton("Conferma"){_,_->db.completeDayVisit(task.id,day.toString());showDay(day)}.show()}
+   small("× Annulla visita"){AlertDialog.Builder(this).setTitle("Annullare questa visita?").setMessage("La visita programmata verrà eliminata definitivamente, senza registrarla nello storico.").setNegativeButton("Torna indietro",null).setPositiveButton("Elimina visita"){_,_->db.cancelDayVisit(task.id,day.toString());showDay(day)}.show()}
    root.addView(row)
   }
-  root.addView(button("Aggiungi giro al calendario"){
+  root.addView(secondaryButton("Aggiungi giro al calendario"){
    val start=day.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
    val description=items.mapIndexed{index,task->"${index+1}. ${task.name}: ${task.notes}"}.joinToString("\n")
    openExternal(Intent(Intent.ACTION_INSERT).setData(CalendarContract.Events.CONTENT_URI)
@@ -465,14 +524,15 @@ shell.addView(bottomNav)
     .putExtra(CalendarContract.EXTRA_EVENT_END_TIME,day.plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()))
   })
  }
+
  private fun showOptions() {
   screen(tr("Opzioni"))
-  root.addView(button("← " + tr("Indietro")){showList()})
+  root.addView(secondaryButton("← " + tr("Indietro")){showHome()})
   heading(tr("Importazione ed esportazione Excel"))
-  root.addView(button(tr("Importa Excel .xlsx")) {
+  root.addView(secondaryButton(tr("Importa Excel .xlsx")) {
    startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply { type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";addCategory(Intent.CATEGORY_OPENABLE) },importRequest)
   })
-  root.addView(button(tr("Esporta Excel .xlsx")) {
+  root.addView(secondaryButton(tr("Esporta Excel .xlsx")) {
    AlertDialog.Builder(this).setTitle(tr("Attenzione ai dati personali"))
     .setMessage(tr("Il file Excel non è cifrato e contiene dati dei clienti. Conservalo in una posizione protetta e non condividerlo senza autorizzazione."))
     .setNegativeButton(tr("Annulla"), null)
@@ -481,13 +541,13 @@ shell.addView(bottomNav)
     }.show()
   })
   heading(tr("Backup e ripristino"))
-  root.addView(button(tr("Crea backup cifrato")) {
+  root.addView(secondaryButton(tr("Crea backup cifrato")) {
    askBackupPassword(tr("Password per il backup (minimo 12 caratteri)")) { password ->
     backupPassword=password
     startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply { type="application/octet-stream";putExtra(Intent.EXTRA_TITLE,"clienti.gcbk");addCategory(Intent.CATEGORY_OPENABLE) },backupRequest)
    }
   })
-  root.addView(button(tr("Ripristina backup cifrato")) {
+  root.addView(secondaryButton(tr("Ripristina backup cifrato")) {
    AlertDialog.Builder(this).setTitle(tr("Ripristino completo"))
     .setMessage(tr("Il ripristino SOSTITUIRÀ tutti i clienti e tutte le visite presenti. Assicurati di avere una copia di sicurezza."))
     .setNegativeButton(tr("Annulla"),null).setPositiveButton(tr("Continua")) { _,_ ->
@@ -499,13 +559,13 @@ shell.addView(bottomNav)
   })
 
   heading("Personalizza campi Info")
-  root.addView(button("Modifica etichette Info1–Info5"){showInfoSettings()})
+  root.addView(secondaryButton("Modifica etichette Info1–Info5"){showInfoSettings()})
   heading(tr("Sicurezza"))
-  root.addView(button(tr("Sicurezza")){showSecurity()})
+  root.addView(secondaryButton(tr("Sicurezza")){showSecurity()})
   heading(tr("Lingua"))
-  root.addView(button(tr("Lingua") + " / Sprache"){chooseLanguage()})
+  root.addView(secondaryButton(tr("Lingua") + " / Sprache"){chooseLanguage()})
   heading(tr("Informazioni sull’app"))
-  root.addView(button(tr("Informazioni sull’app")){showAbout()})
+  root.addView(secondaryButton(tr("Informazioni sull’app")){showAbout()})
  }
  private fun showInfoSettings() {
   screen("Personalizza campi Info")

@@ -200,6 +200,46 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
    sql.setTransactionSuccessful()
   } finally {sql.endTransaction()}
  }
+ // Complete a visit once even when it is also in the manually planned day.
+ fun completeDayVisit(id:Long,day:String) {
+  val sql=writableDatabase
+  sql.beginTransaction()
+  try {
+   sql.rawQuery("SELECT codice,tipo FROM attivita WHERE id=? AND completata=0",arrayOf(id.toString())).use { c ->
+    if(c.moveToFirst()) {
+     val code=c.getString(0)
+     val type=c.getString(1)
+     if(type=="visita" || type=="giro") {
+      val values=android.content.ContentValues().apply { put("completata",1) }
+      if(sql.update("attivita",values,"id=? AND completata=0",arrayOf(id.toString()))==1) {
+       sql.execSQL("INSERT INTO visite(codice,data) VALUES(?,?)",arrayOf(code,LocalDate.now().toString()))
+       if(type=="visita") {
+        sql.delete("attivita","codice=? AND tipo='giro' AND data=? AND completata=0",arrayOf(code,day))
+       } else {
+        sql.delete("attivita","codice=? AND tipo='visita' AND data<=? AND completata=0",arrayOf(code,day))
+       }
+      }
+     }
+    }
+   }
+   sql.setTransactionSuccessful()
+  } finally { sql.endTransaction() }
+ }
+ fun cancelDayVisit(id:Long,day:String) {
+  val sql=writableDatabase
+  sql.beginTransaction()
+  try {
+   sql.rawQuery("SELECT codice,tipo FROM attivita WHERE id=? AND completata=0",arrayOf(id.toString())).use { c ->
+    if(c.moveToFirst()) {
+     val code=c.getString(0)
+     val type=c.getString(1)
+     sql.delete("attivita","id=? AND completata=0",arrayOf(id.toString()))
+     if(type=="visita")sql.delete("attivita","codice=? AND tipo='giro' AND data=? AND completata=0",arrayOf(code,day))
+    }
+   }
+   sql.setTransactionSuccessful()
+  } finally { sql.endTransaction() }
+ }
  fun removeTask(id:Long){writableDatabase.delete("attivita","id=?",arrayOf(id.toString()))}
  fun changeTaskNote(id:Long,note:String){val cv=android.content.ContentValues().apply{put("note",note)};writableDatabase.update("attivita",cv,"id=?",arrayOf(id.toString()))}
  fun swapDayTasks(a:Task,b:Task){val db=writableDatabase;db.beginTransaction();try{db.execSQL("UPDATE attivita SET posizione=? WHERE id=?",arrayOf(b.position,a.id));db.execSQL("UPDATE attivita SET posizione=? WHERE id=?",arrayOf(a.position,b.id));db.setTransactionSuccessful()}finally{db.endTransaction()}}

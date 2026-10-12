@@ -324,19 +324,6 @@ shell.addView(bottomNav)
   updateZoneLabel()
   searchBar.addView(searchRow)
   val filterButtons=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
-  fun filterRow(vararg entries:Pair<String,()->Unit>) {
-   val row=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
-   entries.forEach { (label,action) ->
-    val control=secondaryButton(label,action).apply {
-     textSize=11f
-     minWidth=0;minimumWidth=0
-     setPadding(dp(2),dp(5),dp(2),dp(5))
-     isAllCaps=false
-    }
-    row.addView(control,LinearLayout.LayoutParams(0,dp(43),1f).apply { marginEnd=dp(4);topMargin=dp(4) })
-   }
-   filterButtons.addView(row)
-  }
   val infoActions=(1..5).map { number ->
    val field="info$number"
    Pair(infoLabel(field),{

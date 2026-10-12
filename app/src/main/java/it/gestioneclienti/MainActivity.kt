@@ -287,6 +287,8 @@ shell.addView(bottomNav)
   return root
  }
  private val selectedZones=mutableSetOf<String>()
+ private var selectedInfoField:String?=null
+ private var selectedInfoValue:Boolean=true
  private val sortLabels=listOf("Nome cliente","Codice cliente","Città","Zona","Settore","Data ultima visita","Numero visite annuali")
  private val sortKeys=listOf("name","code","city","zone","sector","visit","count")
  private fun showList(q:String=listSearch) {
@@ -301,7 +303,6 @@ shell.addView(bottomNav)
   header.addView(homeIconAction(R.drawable.ic_home_add,"Nuovo cliente") { saveListPosition(scroll);edit(null) })
   header.addView(homeIconAction(R.drawable.ic_home_filter,"Filtri") { listFiltersVisible=!listFiltersVisible;searchBar.visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE })
   header.addView(homeIconAction(R.drawable.ic_home_sort,"Ordina clienti") { sortAction() })
-  header.addView(homeIconAction(R.drawable.ic_home_settings,"Opzioni") { saveListPosition(scroll);showOptions() })
   root.addView(header)
   heading("Elenco clienti")
   searchBar=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL;visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE }
@@ -315,9 +316,21 @@ shell.addView(bottomNav)
   updateZoneLabel()
   searchRow.addView(zoneAction)
   searchBar.addView(searchRow)
+  searchBar.addView(secondaryButton("Filtro Info1–Info5: "+(selectedInfoField?.let { infoLabel(it)+" = "+(if(selectedInfoValue)"Vero" else "Falso") } ?: "Nessuno")) {
+   val fields=(1..5).map { "info$it" }
+   val labels=fields.map { infoLabel(it) }.toTypedArray()
+   AlertDialog.Builder(this).setTitle("Filtra clienti per")
+    .setItems(labels){_,index->
+     val field=fields[index]
+     AlertDialog.Builder(this).setTitle(infoLabel(field))
+      .setItems(arrayOf("Vero","Falso")){_,which->selectedInfoField=field;selectedInfoValue=which==0;listScrollY=0;showList()}
+      .setNegativeButton("Annulla",null).show()
+    }.setNeutralButton("Cancella filtro"){_,_->selectedInfoField=null;listScrollY=0;showList()}
+     .setNegativeButton("Annulla",null).show()
+  })
   root.addView(searchBar)
   val resetAction=compactTextAction("×","Azzera filtri") {
-   listSearch="";listZone="";selectedZones.clear();listScrollY=0
+   listSearch="";listZone="";selectedZones.clear();selectedInfoField=null;listScrollY=0
    prefs.edit().putString("sort_key","name").putBoolean("sort_desc",false).apply();showList("")
   }
   // Reset remains accessible through the zone selector without taking a full row.
@@ -337,7 +350,14 @@ shell.addView(bottomNav)
    val pending=db.tasks().filter { it.type=="visita" || it.type=="contatto" }.groupBy { it.code }
    val today=LocalDate.now().toString()
    db.sortedList(listSearch,sort,descending).forEach{(code,name)->
-    if(selectedZones.isEmpty() || db.get(code)?.get("zona")?.trim() in selectedZones) {
+    val customer=db.get(code)
+    val zoneMatches=selectedZones.isEmpty() || customer?.get("zona")?.trim() in selectedZones
+    val infoMatches=selectedInfoField?.let { field ->
+     val value=customer?.get(field)?.trim().orEmpty()
+     val truthy=value.equals("true",true) || value=="1"
+     if(selectedInfoValue) truthy else !truthy
+    } ?: true
+    if(zoneMatches && infoMatches) {
      val flags=pending[code].orEmpty().map { task ->
       val label=if(task.type=="visita") "Visita" else "Chiamata"
       when {task.date==null -> "$label da programmare";task.date<today -> "⚠ $label scaduta (${formatDate(task.date)})";task.date==today -> "$label oggi";else -> "$label ${formatDate(task.date)}"}
@@ -432,7 +452,7 @@ shell.addView(bottomNav)
  }
  private fun showDay(day:LocalDate=selectedDay){
   selectedDay=day;screen("Pianifica giornata")
-  root.addView(button("← Home"){showList()})
+  root.addView(button("← Home"){showHome()})
   root.addView(button("Data: "+formatDate(day.toString())){pickDate(day){showDay(it)}})
   root.addView(button("+ Aggiungi cliente"){
    val clients=db.allCustomers()
@@ -442,16 +462,22 @@ shell.addView(bottomNav)
     try{db.addDayClient(code,day.toString());showDay(day)}catch(e:Exception){Toast.makeText(this,e.message,Toast.LENGTH_LONG).show()}
    }.setNegativeButton("Annulla",null).show()
   })
-  val items=db.tasks("giro",day.toString())
+  val manual=db.tasks("giro",day.toString())
+  val scheduled=db.tasks("visita").filter { it.date!=null && it.date<=day.toString() }
+  // A customer present in both lists must only appear once.
+  val scheduledCodes=scheduled.map { it.code }.toSet()
+  val items=scheduled+manual.filter { it.code !in scheduledCodes }
+  heading("Visite da effettuare · "+items.size)
+  if(items.isEmpty())root.addView(secondaryButton("Nessuna visita da effettuare per questa data"){})
   items.forEachIndexed{index,task->
-   root.addView(secondaryButton("${index+1}. ${task.name}\n${task.notes}"){detail(task.code)})
+   val overdue=task.date!=null && task.date<day.toString() && task.type=="visita"
+   val label=if(task.type=="visita") (if(overdue)"⚠ Visita scaduta · " else "Visita programmata · ") +formatDate(task.date.orEmpty()) else "Aggiunta al giro"
+   root.addView(secondaryButton("${index+1}. ${task.name}\n$"+label\n${task.notes}"){detail(task.code)})
    val row=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
    fun small(text:String,action:()->Unit){row.addView(Button(this).apply{this.text=text;isAllCaps=false;setOnClickListener{action()}},LinearLayout.LayoutParams(0,dp(50),1f))}
-   small("↑"){if(index>0){db.swapDayTasks(task,items[index-1]);showDay(day)}}
-   small("↓"){if(index<items.lastIndex){db.swapDayTasks(task,items[index+1]);showDay(day)}}
    small("Note"){val input=EditText(this).apply{setText(task.notes)};AlertDialog.Builder(this).setTitle("Note visita").setView(input).setNegativeButton("Annulla",null).setPositiveButton("Salva"){_,_->db.changeTaskNote(task.id,input.text.toString());showDay(day)}.show()}
-   small("✓"){confirmCompletion(task){showDay(day)}}
-   small("×"){db.removeTask(task.id);showDay(day)}
+   small("✓ Conferma"){AlertDialog.Builder(this).setTitle("Conferma visita").setMessage("Confermi che la visita a ${task.name} è stata effettuata?").setNegativeButton("Indietro",null).setPositiveButton("Conferma"){_,_->db.completeDayVisit(task.id,day.toString());showDay(day)}.show()}
+   small("× Annulla"){AlertDialog.Builder(this).setTitle("Annullare questa visita?").setMessage("La visita programmata verrà eliminata definitivamente, senza registrarla nello storico.").setNegativeButton("Torna indietro",null).setPositiveButton("Elimina visita"){_,_->db.cancelDayVisit(task.id,day.toString());showDay(day)}.show()}
    root.addView(row)
   }
   root.addView(button("Aggiungi giro al calendario"){
@@ -465,6 +491,7 @@ shell.addView(bottomNav)
     .putExtra(CalendarContract.EXTRA_EVENT_END_TIME,day.plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()))
   })
  }
+
  private fun showOptions() {
   screen(tr("Opzioni"))
   root.addView(button("← " + tr("Indietro")){showList()})

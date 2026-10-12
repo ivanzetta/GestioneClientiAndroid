@@ -176,7 +176,13 @@ class MainActivity: Activity() {
  private fun contactRow(label:String,value:String,symbol:String,action:()->Unit) {
   if(value.isBlank()) return
   val row=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL;setPadding(0,dp(4),0,dp(4)) }
-  row.addView(TextView(this).apply { text="${tr(label)}: $value";textSize=16f;setTextColor(ink);layoutParams=LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f) })
+  row.addView(TextView(this).apply {
+   val prefix=tr(label)+": "
+   text=android.text.SpannableString(prefix+value).apply {
+    setSpan(android.text.style.StyleSpan(Typeface.BOLD),prefix.length,length,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+   }
+   textSize=16f;setTextColor(ink);layoutParams=LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f)
+  })
   row.addView(iconButton(symbol,label,action));root.addView(row)
  }
  private fun primaryButton(label:String, action:()->Unit):Button=button(label,action).apply { background=shape(Color.rgb(255,216,91)) }
@@ -216,8 +222,6 @@ class MainActivity: Activity() {
   header.addView(homeText("YellowKunde",27f,true,Color.BLACK))
   header.addView(homeText("Gestione clienti",15f,false,Color.rgb(85,70,30)))
   root.addView(header,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=dp(15)})
-  root.addView(homeText("Benvenuto!",22f,true))
-  root.addView(homeText("Ecco la tua giornata di oggi.",14f,false,Color.DKGRAY))
   root.addView(homeText("Riepilogo attività",18f,true))
   val now=LocalDate.now()
   val tasks=db.tasks().filter { it.type=="visita" || it.type=="contatto" }
@@ -307,11 +311,9 @@ shell.addView(bottomNav)
   val header=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
   header.addView(TextView(this).apply { text="YellowKunde";textSize=23f;setSingleLine(true);ellipsize=android.text.TextUtils.TruncateAt.END;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;layoutParams=LinearLayout.LayoutParams(0,dp(44),1f);gravity=android.view.Gravity.CENTER_VERTICAL })
   header.addView(homeIconAction(R.drawable.ic_home_add,"Nuovo cliente") { saveListPosition(scroll);edit(null) })
-  header.addView(homeIconAction(R.drawable.ic_home_filter,"Filtri") { listFiltersVisible=!listFiltersVisible;searchBar.visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE })
-  header.addView(homeIconAction(R.drawable.ic_home_sort,"Ordina clienti") { sortAction() })
   root.addView(header)
   heading("Elenco clienti")
-  searchBar=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL;visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE }
+  searchBar=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
   val searchRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
   val search=EditText(this).apply{hint=tr("Cerca codice, nome, città, settore, zona");setSingleLine(true);setText(q);textSize=14f;setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_home_search,0,0,0);compoundDrawablePadding=dp(7)}
   searchRow.addView(search,LinearLayout.LayoutParams(0,dp(48),1f))
@@ -320,20 +322,55 @@ shell.addView(bottomNav)
   val zoneAction=homeIconAction(R.drawable.ic_home_zone,"Zona") {}
   fun updateZoneLabel() { zoneAction.contentDescription=tr("Zona")+": "+(if(selectedZones.isEmpty()) tr("Tutte le zone") else selectedZones.joinToString(", ")) }
   updateZoneLabel()
-  searchRow.addView(zoneAction)
   searchBar.addView(searchRow)
-  searchBar.addView(secondaryButton("Filtro Info1–Info5: "+(selectedInfoField?.let { infoLabel(it)+" = "+(if(selectedInfoValue)"Vero" else "Falso") } ?: "Nessuno")) {
-   val fields=(1..5).map { "info$it" }
-   val labels=fields.map { infoLabel(it) }.toTypedArray()
-   AlertDialog.Builder(this).setTitle("Filtra clienti per")
-    .setItems(labels){_,index->
-     val field=fields[index]
-     AlertDialog.Builder(this).setTitle(infoLabel(field))
-      .setItems(arrayOf("Vero","Falso")){_,which->selectedInfoField=field;selectedInfoValue=which==0;listScrollY=0;showList()}
-      .setNegativeButton("Annulla",null).show()
-    }.setNeutralButton("Cancella filtro"){_,_->selectedInfoField=null;listScrollY=0;showList()}
+  val filterButtons=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
+  fun filterRow(vararg entries:Pair<String,()->Unit>) {
+   val row=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
+   entries.forEach { (label,action) ->
+    val control=secondaryButton(label,action).apply {
+     textSize=11f
+     minWidth=0;minimumWidth=0
+     setPadding(dp(2),dp(5),dp(2),dp(5))
+     isAllCaps=false
+    }
+    row.addView(control,LinearLayout.LayoutParams(0,dp(43),1f).apply { marginEnd=dp(4);topMargin=dp(4) })
+   }
+   filterButtons.addView(row)
+  }
+  val infoActions=(1..5).map { number ->
+   val field="info$number"
+   Pair(infoLabel(field),{
+    AlertDialog.Builder(this).setTitle(infoLabel(field))
+     .setItems(arrayOf("Vero","Falso")){_,which->
+      selectedInfoField=field;selectedInfoValue=which==0;listScrollY=0;showList()
+     }
+     .setNeutralButton("Rimuovi filtro"){_,_->selectedInfoField=null;listScrollY=0;showList()}
      .setNegativeButton("Annulla",null).show()
-  })
+   })
+  }
+  val infoContainer=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
+  val toggleFilters:()->Unit={listFiltersVisible=!listFiltersVisible;infoContainer.visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE}
+  filterRow(Pair("Filtri",toggleFilters),Pair("Ordina",{sortAction()}),Pair("Zona",{zoneAction.performClick()}))
+  filterButtons.removeAllViews()
+  val firstRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
+  fun addSquare(row:LinearLayout,label:String,action:()->Unit) {
+   row.addView(secondaryButton(label,action).apply {
+    textSize=11f;minWidth=0;minimumWidth=0;isAllCaps=false
+    setPadding(dp(2),dp(4),dp(2),dp(4))
+   },LinearLayout.LayoutParams(0,dp(46),1f).apply {marginEnd=dp(4);topMargin=dp(5)})
+  }
+  addSquare(firstRow,"Filtri",toggleFilters)
+  addSquare(firstRow,"Ordina",{sortAction()})
+  addSquare(firstRow,"Zona",{zoneAction.performClick()})
+  filterButtons.addView(firstRow)
+  infoActions.chunked(4).forEach { chunk ->
+   val row=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
+   chunk.forEach { (label,action) -> addSquare(row,label,action) }
+   infoContainer.addView(row)
+  }
+  infoContainer.visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE
+  filterButtons.addView(infoContainer)
+  searchBar.addView(filterButtons)
   root.addView(searchBar)
   val resetAction=compactTextAction("×","Azzera filtri") {
    listSearch="";listZone="";selectedZones.clear();selectedInfoField=null;listScrollY=0
@@ -509,8 +546,8 @@ shell.addView(bottomNav)
     small("↓"){if(manualIndex>=0 && manualIndex<manualItems.lastIndex){db.swapDayTasks(task,manualItems[manualIndex+1]);showDay(day)}}
    }
    small("Note"){val input=EditText(this).apply{setText(task.notes)};AlertDialog.Builder(this).setTitle("Note visita").setView(input).setNegativeButton("Annulla",null).setPositiveButton("Salva"){_,_->db.changeTaskNote(task.id,input.text.toString());showDay(day)}.show()}
-   small("✓ Conferma visita"){AlertDialog.Builder(this).setTitle("Conferma visita").setMessage("Confermi che la visita a ${task.name} è stata effettuata?").setNegativeButton("Indietro",null).setPositiveButton("Conferma"){_,_->db.completeDayVisit(task.id,day.toString());showDay(day)}.show()}
-   small("× Annulla visita"){AlertDialog.Builder(this).setTitle("Annullare questa visita?").setMessage("La visita programmata verrà eliminata definitivamente, senza registrarla nello storico.").setNegativeButton("Torna indietro",null).setPositiveButton("Elimina visita"){_,_->db.cancelDayVisit(task.id,day.toString());showDay(day)}.show()}
+   small("✓ Conferma"){AlertDialog.Builder(this).setTitle("Conferma visita").setMessage("Confermi che la visita a ${task.name} è stata effettuata?").setNegativeButton("Indietro",null).setPositiveButton("Conferma"){_,_->db.completeDayVisit(task.id,day.toString());showDay(day)}.show()}
+   small("× Annulla"){AlertDialog.Builder(this).setTitle("Annullare questa visita?").setMessage("La visita programmata verrà eliminata definitivamente, senza registrarla nello storico.").setNegativeButton("Torna indietro",null).setPositiveButton("Elimina visita"){_,_->db.cancelDayVisit(task.id,day.toString());showDay(day)}.show()}
    root.addView(row)
   }
   root.addView(secondaryButton("Aggiungi giro al calendario"){
@@ -668,7 +705,14 @@ shell.addView(bottomNav)
       }
      }
     })
-   } else if(key !in actionFields) root.addView(TextView(this).apply { text="${tr(captions[index])}: ${customer[key].orEmpty()}";textSize=16f;setPadding(0,5,0,5) })
+   } else if(key !in actionFields) root.addView(TextView(this).apply {
+    val label=tr(captions[index])+": "
+    val value=customer[key].orEmpty()
+    text=android.text.SpannableString(label+value).apply {
+     setSpan(android.text.style.StyleSpan(Typeface.BOLD),label.length,length,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    }
+    textSize=16f;setPadding(0,5,0,5)
+   })
   }
   listOf("telefono_principale","telefono_secondario").forEach { key ->
    val number=customer[key].orEmpty().trim()

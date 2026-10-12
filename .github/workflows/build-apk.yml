@@ -21,14 +21,19 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+     
       - name: Build APK and AAB
+        env:
+          GRADLE_OPTS: "-Xmx4g -XX:MaxMetaspaceSize=1g"
+          JAVA_TOOL_OPTIONS: "-Xmx4g"
         run: |
           if [ -f ./gradlew ]; then
             chmod +x ./gradlew
-            ./gradlew assembleDebug bundleRelease
+            ./gradlew --no-daemon --max-workers=2 assembleDebug bundleRelease
           else
-            gradle assembleDebug bundleRelease
+            gradle --no-daemon --max-workers=2 assembleDebug bundleRelease
           fi
+
 
       - name: Verify APK
         run: |

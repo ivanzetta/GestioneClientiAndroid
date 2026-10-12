@@ -73,9 +73,9 @@ jobs:
           jarsigner -verify "$SIGNED_AAB"
           echo "AAB firmato e verificato."
 
-      - name: Upload AAB
+           - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
         with:
-          name: YellowKunde-AAB-Release-Unsigned
-          path: app/build/outputs/bundle/release/*.aab
+          name: YellowKunde-AAB-Release-Firmato
+          path: app/build/outputs/bundle/release/YellowKunde-0.9.4-signed.aab
           if-no-files-found: error

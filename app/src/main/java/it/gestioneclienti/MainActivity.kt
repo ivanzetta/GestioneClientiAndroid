@@ -550,7 +550,7 @@ shell.addView(bottomNav)
  }
  private fun showDay(day:LocalDate=selectedDay){
   selectedDay=day;screen("Pianifica giornata")
-  root.addView(button("← Home"){showHome()})
+  root.addView(button("← Home"){showHome()}.apply {minHeight=dp(40);minimumHeight=dp(40);textSize=14f;setPadding(dp(8),0,dp(8),0)},LinearLayout.LayoutParams(-1,dp(42)).apply {bottomMargin=dp(5)})
   root.addView(secondaryButton("Data: "+formatDate(day.toString())){pickDate(day){showDay(it)}})
   root.addView(primaryButton("+ Aggiungi cliente"){
    val allClients=db.allCustomers()
@@ -631,7 +631,7 @@ shell.addView(bottomNav)
    }
    root.addView(row)
   }
-  root.addView(secondaryButton("Aggiungi giro al calendario"){
+  root.addView(secondaryButton("▦+  Aggiungi giro al calendario"){
    val start=day.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
    val description=items.mapIndexed{index,task->"${index+1}. ${task.name}: ${task.notes}"}.joinToString("\n")
    openExternal(Intent(Intent.ACTION_INSERT).setData(CalendarContract.Events.CONTENT_URI)

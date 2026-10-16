@@ -178,7 +178,10 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
  }
  fun saveTask(code:String,type:String,date:String?,notes:String):Boolean {
   require(type=="visita" || type=="contatto")
-  if(type=="visita" && date!=null) require(!hasVisit(code,date)) { "Visita già registrata per questo giorno" }
+  if(type=="visita" && date!=null) {
+   require(!hasVisit(code,date)) { "Visita già registrata per questo giorno" }
+   require(!readableDatabase.rawQuery("SELECT 1 FROM attivita WHERE codice=? AND tipo='giro' AND data=? AND completata=0 LIMIT 1",arrayOf(code,date)).use { it.moveToFirst() }) { "Cliente già inserito nel giro di questa data" }
+  }
   val cv=android.content.ContentValues().apply {put("codice",code);put("tipo",type);put("data",date);put("note",notes);put("completata",0)}
   val existing=readableDatabase.rawQuery("SELECT id FROM attivita WHERE codice=? AND tipo=? AND completata=0",arrayOf(code,type)).use { if(it.moveToFirst()) it.getLong(0) else null }
   if(existing!=null) writableDatabase.update("attivita",cv,"id=?",arrayOf(existing.toString())) else writableDatabase.insertOrThrow("attivita",null,cv)
@@ -188,6 +191,7 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
   val already=readableDatabase.rawQuery("SELECT 1 FROM attivita WHERE codice=? AND tipo='giro' AND data=? AND completata=0",arrayOf(code,date)).use {it.moveToFirst()}
   require(!already){"Cliente già presente in questo giro"}
   require(!hasVisit(code,date)){"Visita già registrata per questo cliente nella data selezionata"}
+  require(!readableDatabase.rawQuery("SELECT 1 FROM attivita WHERE codice=? AND tipo='visita' AND data<=? AND completata=0 LIMIT 1",arrayOf(code,date)).use { it.moveToFirst() }) { "Visita già programmata per questo cliente" }
   val next=readableDatabase.rawQuery("SELECT COALESCE(MAX(posizione),0)+1 FROM attivita WHERE tipo='giro' AND data=?",arrayOf(date)).use{it.moveToFirst();it.getInt(0)}
   val cv=android.content.ContentValues().apply{put("codice",code);put("tipo","giro");put("data",date);put("note",notes);put("posizione",next)}
   writableDatabase.insertOrThrow("attivita",null,cv)

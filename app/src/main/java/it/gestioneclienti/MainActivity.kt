@@ -34,6 +34,7 @@ class MainActivity: Activity() {
  private lateinit var keyguardManager:KeyguardManager
  private val infoKeys=(1..5).map { "info$it" }
  private fun infoLabel(key:String)=prefs.getString("label_$key","Info"+key.removePrefix("info")) ?: key
+ private fun customInfo(key:String)=prefs.getString("label_$key",null)?.trim()?.takeIf { it.isNotBlank() && it!="Info"+key.removePrefix("info") }
  private var prompting=false
  private var hasStarted=false
  private var activationDialogShowing=false
@@ -61,7 +62,7 @@ class MainActivity: Activity() {
  private var editingCustomerCode:String?=null
  private var editingFields:Map<String,EditText> = emptyMap()
  private var originalValues:Map<String,String> = emptyMap()
- private var listFiltersVisible=true
+ private var listFiltersVisible=false
  private var listSearch=""
  private var listZone=""
  private var listScrollY=0
@@ -240,7 +241,7 @@ class MainActivity: Activity() {
      if(overdue>0)addView(homeText("⚠ $overdue scadute",12f,true,Color.rgb(180,40,30)).apply{gravity=android.view.Gravity.CENTER})
      setOnClickListener { showTasks(type,period) }
     }
-    tiles.addView(card,LinearLayout.LayoutParams(0,dp(145),1f).apply { marginStart=if(i==0)0 else dp(5);marginEnd=if(i==0)dp(5) else 0 })
+    tiles.addView(card,LinearLayout.LayoutParams(0,dp(108),1f).apply { marginStart=if(i==0)0 else dp(5);marginEnd=if(i==0)dp(5) else 0 })
    }
    root.addView(tiles,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(9);bottomMargin=dp(5)})
   }
@@ -324,11 +325,11 @@ shell.addView(bottomNav)
   updateZoneLabel()
   searchBar.addView(searchRow)
   val filterButtons=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
-  val infoActions=(1..5).map { number ->
+  val infoActions=(1..5).filter { customInfo("info$it")!=null }.map { number ->
    val field="info$number"
    Pair(infoLabel(field),{
     AlertDialog.Builder(this).setTitle(infoLabel(field))
-     .setItems(arrayOf("Vero","Falso")){_,which->
+     .setItems(arrayOf("SÌ","NO")){_,which->
       selectedInfoField=field;selectedInfoValue=which==0;listScrollY=0;showList()
      }
      .setNeutralButton("Rimuovi filtro"){_,_->selectedInfoField=null;listScrollY=0;showList()}
@@ -345,9 +346,10 @@ shell.addView(bottomNav)
     setPadding(dp(2),dp(4),dp(2),dp(4))
    },LinearLayout.LayoutParams(0,dp(46),1f).apply {marginEnd=dp(4);topMargin=dp(5)})
   }
-  addSquare(firstRow,"Filtri",toggleFilters)
-  addSquare(firstRow,"Ordina",{sortAction()})
-  addSquare(firstRow,"Zona",{zoneAction.performClick()})
+  addSquare(firstRow,"☷",toggleFilters)
+  addSquare(firstRow,"↕",{sortAction()})
+  addSquare(firstRow,"◎",{zoneAction.performClick()})
+   addSquare(firstRow,"ⓘ",{toggleFilters()})
   filterButtons.addView(firstRow)
   infoActions.chunked(4).forEach { chunk ->
    val row=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
@@ -442,7 +444,7 @@ shell.addView(bottomNav)
   AlertDialog.Builder(this).setTitle(if(type=="visita")"Pianifica visita" else "Da contattare").setView(wrapper)
    .setNegativeButton("Annulla",null)
    .setNeutralButton("Calendario"){_,_->saveTaskAndCalendar(code,type,date,note.text.toString())}
-   .setPositiveButton("Salva"){_,_->db.saveTask(code,type,date,note.text.toString());detail(code)}.show()
+   .setPositiveButton("Salva"){_,_->try { db.saveTask(code,type,date,note.text.toString());detail(code) } catch(e:Exception){Toast.makeText(this,e.message,Toast.LENGTH_LONG).show();detail(code)} }.show()
  }
  private fun saveTaskAndCalendar(code:String,type:String,date:String?,note:String){
   db.saveTask(code,type,date,note)
@@ -513,7 +515,7 @@ shell.addView(bottomNav)
   val scheduled=db.tasks("visita").filter { it.date!=null && it.date<=day.toString() }
   // A customer present in both lists must only appear once.
   val scheduledCodes=scheduled.map { it.code }.toSet()
-  val items=scheduled+manual.filter { it.code !in scheduledCodes }
+  val items=(scheduled+manual.filter { it.code !in scheduledCodes }).filter { !db.hasVisit(it.code,day.toString()) }
   heading("Visite da effettuare · "+items.size)
   if(items.isEmpty())root.addView(homeCard(paleYellow).apply { addView(homeText("Nessuna visita da effettuare per questa data")) })
   items.forEachIndexed{index,task->
@@ -750,7 +752,7 @@ shell.addView(bottomNav)
    text="Note attività completate:\n"+completed.joinToString("\n") { "• "+(if(it.type=="contatto")"Telefonata" else "Visita")+": "+it.notes }
    textSize=15f;setPadding(0,dp(8),0,dp(12))
   })
-  root.addView(button(tr("Registra visita (oggi)")){db.visit(code);detail(code)})
+  root.addView(button(tr("Registra visita (oggi)")){try { db.visit(code);detail(code) } catch(e:Exception){Toast.makeText(this,e.message,Toast.LENGTH_LONG).show()} })
   root.addView(button(tr("Registra visita dal calendario")) {
    pickDate { date ->
     try { db.visit(code,date);detail(code) }
@@ -781,7 +783,8 @@ shell.addView(bottomNav)
   when(currentPage) {
    "options" -> showHome()
    "list" -> showHome()
-   "detail", "tasks", "day" -> showList()
+   "detail" -> showList()
+    "tasks", "day" -> showHome()
    "suboptions" -> showOptions()
    "edit" -> {
     val changed=editingFields.any { (key,field) -> field.text.toString() != (originalValues[key] ?: "") }
@@ -792,7 +795,8 @@ shell.addView(bottomNav)
      .setPositiveButton(tr("Esci senza salvare")){_,_->goBack()}.show()
     else goBack()
    }
-   else -> super.onBackPressed()
+   "home" -> Toast.makeText(this,"Sei nella Home",Toast.LENGTH_SHORT).show()
+    else -> showHome()
   }
  }
  private fun openExternal(intent:Intent) {

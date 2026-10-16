@@ -645,12 +645,18 @@ shell.addView(bottomNav)
 
  private fun showOptions() {
   screen(tr("Opzioni"))
-  root.addView(secondaryButton("← " + tr("Indietro")){showHome()})
-  heading(tr("Importazione ed esportazione Excel"))
-  root.addView(secondaryButton(tr("Importa Excel .xlsx")) {
+  root.addView(secondaryButton("← " + tr("Indietro")){showHome()}.apply {minHeight=dp(42);minimumHeight=dp(42)})
+  fun optionsHeading(icon:String,title:String) {
+   root.addView(homeCard(paleYellow).apply {
+    addView(homeText("$icon  $title",17f,true))
+   })
+  }
+
+  optionsHeading("▣",tr("Importazione ed esportazione Excel"))
+  root.addView(secondaryButton("↑  "+tr("Importa Excel .xlsx")) {
    startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply { type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";addCategory(Intent.CATEGORY_OPENABLE) },importRequest)
   })
-  root.addView(secondaryButton(tr("Esporta Excel .xlsx")) {
+  root.addView(secondaryButton("↓  "+tr("Esporta Excel .xlsx")) {
    AlertDialog.Builder(this).setTitle(tr("Attenzione ai dati personali"))
     .setMessage(tr("Il file Excel non è cifrato e contiene dati dei clienti. Conservalo in una posizione protetta e non condividerlo senza autorizzazione."))
     .setNegativeButton(tr("Annulla"), null)
@@ -658,14 +664,14 @@ shell.addView(bottomNav)
      startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply { type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";putExtra(Intent.EXTRA_TITLE,"clienti.xlsx");addCategory(Intent.CATEGORY_OPENABLE) },exportRequest)
     }.show()
   })
-  heading(tr("Backup e ripristino"))
-  root.addView(secondaryButton(tr("Crea backup cifrato")) {
+  optionsHeading("▤",tr("Backup e ripristino"))
+  root.addView(secondaryButton("⊕  "+tr("Crea backup cifrato")) {
    askBackupPassword(tr("Password per il backup (minimo 12 caratteri)")) { password ->
     backupPassword=password
     startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply { type="application/octet-stream";putExtra(Intent.EXTRA_TITLE,"clienti.gcbk");addCategory(Intent.CATEGORY_OPENABLE) },backupRequest)
    }
   })
-  root.addView(secondaryButton(tr("Ripristina backup cifrato")) {
+  root.addView(secondaryButton("↻  "+tr("Ripristina backup cifrato")) {
    AlertDialog.Builder(this).setTitle(tr("Ripristino completo"))
     .setMessage(tr("Il ripristino SOSTITUIRÀ tutti i clienti e tutte le visite presenti. Assicurati di avere una copia di sicurezza."))
     .setNegativeButton(tr("Annulla"),null).setPositiveButton(tr("Continua")) { _,_ ->
@@ -676,14 +682,14 @@ shell.addView(bottomNav)
     }.show()
   })
 
-  heading("Personalizza campi Info")
-  root.addView(secondaryButton("Modifica etichette Info1–Info5"){showInfoSettings()})
-  heading(tr("Sicurezza"))
-  root.addView(secondaryButton(tr("Sicurezza")){showSecurity()})
-  heading(tr("Lingua"))
-  root.addView(secondaryButton(tr("Lingua") + " / Sprache"){chooseLanguage()})
-  heading(tr("Informazioni sull’app"))
-  root.addView(secondaryButton(tr("Informazioni sull’app")){showAbout()})
+  optionsHeading("⚙","Personalizza campi Info")
+  root.addView(secondaryButton("✎  Modifica etichette Info1–Info5"){showInfoSettings()})
+  optionsHeading("▣",tr("Sicurezza"))
+  root.addView(secondaryButton("▣  "+tr("Sicurezza")){showSecurity()})
+  optionsHeading("◎",tr("Lingua"))
+  root.addView(secondaryButton("◎  "+tr("Lingua") + " / Sprache"){chooseLanguage()})
+  optionsHeading("ⓘ",tr("Informazioni sull’app"))
+  root.addView(secondaryButton("ⓘ  "+tr("Informazioni sull’app")){showAbout()})
  }
  private fun showInfoSettings() {
   screen("Personalizza campi Info")

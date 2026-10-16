@@ -784,10 +784,8 @@ shell.addView(bottomNav)
   screen(if(code==null)tr("Nuovo cliente") else tr("Modifica cliente"))
   editingCustomerCode=code;originalValues=existing
   val inputs=mutableMapOf<String,EditText>()
-  val checks=mutableMapOf<String,android.widget.CheckBox>()
   fields.forEachIndexed{index,key->
-   if(key=="info1") root.addView(TextView(this).apply{text="Informazioni aggiuntive";textSize=19f;typeface=Typeface.DEFAULT_BOLD})
-   if(key in infoKeys) { val check=android.widget.CheckBox(this).apply { text=infoLabel(key);isChecked=existing[key].equals("true",true) || existing[key]=="1" };checks[key]=check;root.addView(check);return@forEachIndexed }
+   if(key in infoKeys) return@forEachIndexed
    root.addView(homeText(tr(captions[index]),14f,true).apply {setPadding(0,dp(8),0,dp(3))})
    val field:EditText=if(key=="zona") AutoCompleteTextView(this).apply { val choices=(db.zones()+listOf(existing[key].orEmpty())).filter { it.isNotBlank() }.distinct().sortedWith(String.CASE_INSENSITIVE_ORDER);setAdapter(ArrayAdapter(this@MainActivity,android.R.layout.simple_dropdown_item_1line,choices));threshold=0;setOnClickListener { showDropDown() };setOnFocusChangeListener { _,focused -> if(focused)showDropDown() } } else EditText(this)
    field.apply{setText(existing[key] ?: "");setSingleLine(key!="note");if(key=="note")minLines=3; if(key.startsWith("telefono"))inputType=InputType.TYPE_CLASS_PHONE; if(key.startsWith("email"))inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS; textSize=15f;background=shape(Color.WHITE,softBorder);setPadding(dp(12),dp(8),dp(12),dp(8))}
@@ -795,7 +793,7 @@ shell.addView(bottomNav)
   }
   editingFields=inputs
   root.addView(primaryButton(tr("Salva")){
-   try {db.save(code,inputs.mapValues{it.value.text.toString()} + checks.mapValues { if(it.value.isChecked) "true" else "false" });detail(inputs.getValue("codice").text.toString().trim())}
+   try {db.save(code,inputs.mapValues{it.value.text.toString()} + infoKeys.associateWith { existing[it] ?: "false" });detail(inputs.getValue("codice").text.toString().trim())}
    catch(e:Exception){Toast.makeText(this,e.message ?: tr("Errore"),Toast.LENGTH_LONG).show()}
   })
   root.addView(button(tr("Annulla")){if(code==null)showList() else detail(code)})

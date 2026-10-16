@@ -726,9 +726,9 @@ shell.addView(bottomNav)
   val customer=db.get(code) ?: run{showList();return}
   screen(customer["nome"].orEmpty())
   val detailToolbar=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
-  detailToolbar.addView(button(tr("← Elenco clienti")){showList()},LinearLayout.LayoutParams(0,dp(56),1f).apply {marginEnd=dp(6)})
+  detailToolbar.addView(button(tr("← Elenco clienti")){showList()}.apply { minHeight=dp(40);minimumHeight=dp(40);setPadding(dp(8),0,dp(8),0);textSize=14f },LinearLayout.LayoutParams(0,dp(40),1f).apply {marginEnd=dp(6)})
   fun detailAction(icon:Int,description:String,action:()->Unit) {
-   detailToolbar.addView(homeIconAction(icon,description,action),LinearLayout.LayoutParams(dp(54),dp(54)).apply {marginStart=dp(5)})
+   detailToolbar.addView(homeIconAction(icon,description,action),LinearLayout.LayoutParams(dp(40),dp(40)).apply {marginStart=dp(5)})
   }
   detailAction(android.R.drawable.ic_menu_edit,"Modifica cliente"){edit(code)}
   detailAction(android.R.drawable.ic_menu_delete,"Elimina cliente"){

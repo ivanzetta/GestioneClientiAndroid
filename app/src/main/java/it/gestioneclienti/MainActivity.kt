@@ -247,7 +247,7 @@ class MainActivity: Activity() {
      if(overdue>0)addView(homeText("⚠ $overdue scadute",12f,true,Color.rgb(180,40,30)).apply{gravity=android.view.Gravity.CENTER})
      setOnClickListener { showTasks(type,period) }
     }
-    tiles.addView(card,LinearLayout.LayoutParams(0,dp(108),1f).apply { marginStart=if(i==0)0 else dp(5);marginEnd=if(i==0)dp(5) else 0 })
+    tiles.addView(card,LinearLayout.LayoutParams(0,dp(148),1f).apply { marginStart=if(i==0)0 else dp(5);marginEnd=if(i==0)dp(5) else 0 })
    }
    root.addView(tiles,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(9);bottomMargin=dp(5)})
   }
@@ -345,13 +345,24 @@ shell.addView(bottomNav)
    })
   }
   val infoContainer=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
-  val toggleFilters:()->Unit={listFiltersVisible=!listFiltersVisible;infoContainer.visibility=if(listInfoVisible) android.view.View.VISIBLE else android.view.View.GONE}
+  val toggleFilters:()->Unit={
+   AlertDialog.Builder(this).setTitle("Filtri clienti")
+    .setItems(arrayOf("Filtra per zona","Filtra per Info personalizzate","Azzera tutti i filtri")){_,which->
+     when(which) {
+      0 -> zoneAction.performClick()
+      1 -> {listInfoVisible=true;infoContainer.visibility=android.view.View.VISIBLE}
+      2 -> {listSearch="";selectedZones.clear();selectedInfoField=null;listScrollY=0;showList("")}
+     }
+    }.setNegativeButton("Annulla",null).show()
+  }
   filterButtons.removeAllViews()
   val firstRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
   fun addSquare(row:LinearLayout,label:String,action:()->Unit) {
    row.addView(secondaryButton(label,action).apply {
-    textSize=11f;minWidth=0;minimumWidth=0;isAllCaps=false
-    setPadding(dp(2),dp(4),dp(2),dp(4))
+    textSize=23f;minWidth=0;minimumWidth=0;isAllCaps=false
+    contentDescription=when(label) {"☷"->"Filtri";"↕"->"Ordina";"◎"->"Zona";"ⓘ"->"Info";else->label}
+    background=shape(Color.rgb(255,243,204))
+    setPadding(dp(2),0,dp(2),0)
    },LinearLayout.LayoutParams(0,dp(46),1f).apply {marginEnd=dp(4);topMargin=dp(5)})
   }
   addSquare(firstRow,"☷",toggleFilters)
@@ -456,7 +467,8 @@ shell.addView(bottomNav)
    .setPositiveButton("Salva"){_,_->try { db.saveTask(code,type,date,note.text.toString());detail(code) } catch(e:Exception){Toast.makeText(this,e.message,Toast.LENGTH_LONG).show();detail(code)} }.show()
  }
  private fun saveTaskAndCalendar(code:String,type:String,date:String?,note:String){
-  db.saveTask(code,type,date,note)
+  try { db.saveTask(code,type,date,note) }
+  catch(e:Exception) { Toast.makeText(this,e.message ?: "Attività già presente per questa data",Toast.LENGTH_LONG).show();return }
   val customer=db.get(code)
   if(date==null){Toast.makeText(this,"Seleziona una data per il calendario",Toast.LENGTH_LONG).show();detail(code);return}
   val day=LocalDate.parse(date)

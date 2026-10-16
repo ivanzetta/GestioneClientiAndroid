@@ -324,10 +324,12 @@ shell.addView(bottomNav)
   val searchRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
   val search=EditText(this).apply{hint=tr("Cerca codice, nome, città, settore, zona");setSingleLine(true);setText(q);textSize=14f;setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_home_search,0,0,0);compoundDrawablePadding=dp(7)}
   searchRow.addView(search,LinearLayout.LayoutParams(0,dp(48),1f))
-  val zoneOptions=db.zones()
-  val zoneLabels=zoneOptions
+  val zoneOptions=db.zones().filter { it.isNotBlank() }
+  val noZoneFilter="__YELLOWKUNDE_NO_ZONE__"
+  val zoneChoices=zoneOptions+noZoneFilter
+  val zoneLabels=zoneOptions+listOf("Senza zona")
   val zoneAction=homeIconAction(R.drawable.ic_home_zone,"Zona") {}
-  fun updateZoneLabel() { zoneAction.contentDescription=tr("Zona")+": "+(if(selectedZones.isEmpty()) tr("Tutte le zone") else selectedZones.joinToString(", ")) }
+  fun updateZoneLabel() { zoneAction.contentDescription=tr("Zona")+": "+(if(selectedZones.isEmpty()) tr("Tutte le zone") else selectedZones.joinToString(", ") { if(it==noZoneFilter) "Senza zona" else it }) }
   updateZoneLabel()
   searchBar.addView(searchRow)
   val filterButtons=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
@@ -372,12 +374,12 @@ shell.addView(bottomNav)
   }
   // Reset remains accessible through the zone selector without taking a full row.
   zoneAction.setOnClickListener {
-   val checked=zoneOptions.map { it in selectedZones }.toBooleanArray()
+   val checked=zoneChoices.map { it in selectedZones }.toBooleanArray()
    AlertDialog.Builder(this).setTitle(tr("Zona"))
     .setMultiChoiceItems(zoneLabels.toTypedArray(),checked){_,which,value->checked[which]=value}
     .setNeutralButton(tr("Tutte le zone")){_,_->selectedZones.clear();listScrollY=0;showList()}
     .setNegativeButton(tr("Annulla"),null)
-    .setPositiveButton(tr("Applica")){_,_->selectedZones.clear();zoneOptions.forEachIndexed{ i,z->if(checked[i]) selectedZones.add(z) };listScrollY=0;showList()}.show()
+    .setPositiveButton(tr("Applica")){_,_->selectedZones.clear();zoneChoices.forEachIndexed{ i,z->if(checked[i]) selectedZones.add(z) };listScrollY=0;showList()}.show()
   }
   val list=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};root.addView(list)
   fun update(){
@@ -388,7 +390,8 @@ shell.addView(bottomNav)
    val today=LocalDate.now().toString()
    db.sortedList(listSearch,sort,descending).forEach{(code,name)->
     val customer=db.get(code)
-    val zoneMatches=selectedZones.isEmpty() || customer?.get("zona")?.trim() in selectedZones
+    val customerZone=customer?.get("zona")?.trim().orEmpty()
+    val zoneMatches=selectedZones.isEmpty() || customerZone in selectedZones || (customerZone.isEmpty() && noZoneFilter in selectedZones)
     val infoMatches=selectedInfoField?.let { field ->
      val value=customer?.get(field)?.trim().orEmpty()
      val truthy=value.equals("true",true) || value=="1"

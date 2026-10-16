@@ -374,10 +374,28 @@ shell.addView(bottomNav)
     setPadding(dp(2),0,dp(2),0)
    },LinearLayout.LayoutParams(0,dp(46),1f).apply {marginEnd=dp(4);topMargin=dp(5)})
   }
-  addSquare(firstRow,"☷",toggleFilters)
-  addSquare(firstRow,"↕",{sortAction()})
-  addSquare(firstRow,"◎",{zoneAction.performClick()})
-   addSquare(firstRow,"ⓘ",{listInfoVisible=!listInfoVisible;infoContainer.visibility=if(listInfoVisible) android.view.View.VISIBLE else android.view.View.GONE})
+  fun addListIcon(icon:Int,label:String,action:()->Unit) {
+   val tile=LinearLayout(this).apply {
+    orientation=LinearLayout.VERTICAL
+    gravity=android.view.Gravity.CENTER
+    background=shape(Color.rgb(255,243,204))
+    contentDescription=label
+    isClickable=true
+    isFocusable=true
+    setOnClickListener { action() }
+   }
+   tile.addView(android.widget.ImageView(this).apply {
+    setImageResource(icon)
+    contentDescription=label
+    scaleType=android.widget.ImageView.ScaleType.FIT_CENTER
+   },LinearLayout.LayoutParams(dp(25),dp(25)))
+   tile.addView(homeText(label,12f,true).apply {gravity=android.view.Gravity.CENTER})
+   firstRow.addView(tile,LinearLayout.LayoutParams(0,dp(54),1f).apply {marginEnd=dp(4);topMargin=dp(5)})
+  }
+  addListIcon(R.drawable.ic_list_filter,"Filtri",toggleFilters)
+  addListIcon(R.drawable.ic_list_sort,"Ordina",{sortAction()})
+  addListIcon(R.drawable.ic_list_zone,"Zona",{zoneAction.performClick()})
+  addListIcon(R.drawable.ic_list_info,"Info",{listInfoVisible=!listInfoVisible;infoContainer.visibility=if(listInfoVisible) android.view.View.VISIBLE else android.view.View.GONE})
   filterButtons.addView(firstRow)
   infoActions.chunked(4).forEach { chunk ->
    val row=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }

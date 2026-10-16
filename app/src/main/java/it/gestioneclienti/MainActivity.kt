@@ -231,13 +231,13 @@ class MainActivity: Activity() {
   root.addView(header,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=dp(15)})
   root.addView(homeText("Riepilogo attività",18f,true))
   val now=LocalDate.now()
-  val tasks=db.tasks().filter { it.type=="visita" || it.type=="contatto" }
+  val tasks=db.tasks().filter { it.type=="visita" || it.type=="contatto" || it.type=="giro" }
   val rows=listOf(listOf("▣","Visite oggi","visita","today"),listOf("▣","Visite future","visita","future"),listOf("☎","Contatti oggi","contatto","today"),listOf("☎","Contatti futuri","contatto","future"))
   rows.chunked(2).forEach { pair ->
    val tiles=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
    pair.forEachIndexed { i,info ->
     val type=info[2];val period=info[3]
-    val matching=tasks.filter { it.type==type && it.date!=null && (if(period=="today") it.date<=now.toString() else it.date>now.toString()) }
+    val matching=tasks.filter { (it.type==type || (type=="visita" && it.type=="giro")) && it.date!=null && (if(period=="today") it.date<=now.toString() else it.date>now.toString()) }.distinctBy { it.code to it.date }
     val overdue=matching.count { it.date!!<now.toString() }
     val card=homeCard(if(type=="visita")Color.rgb(255,246,218) else Color.rgb(225,241,255)).apply {
      gravity=android.view.Gravity.CENTER
@@ -483,7 +483,8 @@ shell.addView(bottomNav)
   root.addView(secondaryButton("← Home"){showHome()})
   heading(if(type=="visita")"Visite" else "Da contattare")
   val today=LocalDate.now().toString()
-  db.tasks(type).filter {task-> when(period){"today"->task.date!=null && task.date<=today;"future"->task.date!=null && task.date>today;else->true} }.forEach {task->
+  val activityList=if(type=="visita") db.tasks().filter { it.type=="visita" || it.type=="giro" } else db.tasks(type)
+  activityList.filter {task-> when(period){"today"->task.date!=null && task.date<=today;"future"->task.date!=null && task.date>today;else->true} }.distinctBy { it.code to it.date }.forEach {task->
    val overdue=task.date!=null && task.date<today
    val prefix=if(overdue)"⚠ SCADUTA · " else ""
    root.addView(secondaryButton(prefix+task.name+" · "+(task.date?.let{formatDate(it)}?:"Senza data")+"\n"+task.notes){detail(task.code)})

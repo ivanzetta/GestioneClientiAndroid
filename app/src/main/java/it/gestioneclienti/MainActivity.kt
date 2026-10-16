@@ -11,6 +11,8 @@ import android.app.KeyguardManager
 import android.content.Context
 import android.app.AlertDialog
 import android.os.Bundle
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import android.text.InputType
 import android.view.ViewGroup
 import android.widget.*
@@ -86,6 +88,9 @@ class MainActivity: Activity() {
   window.decorView.systemUiVisibility = window.decorView.systemUiVisibility and (android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE).inv()
   if (android.os.Build.VERSION.SDK_INT >= 30) window.setDecorFitsSystemWindows(false)
   registerReceiver(object:android.content.BroadcastReceiver(){ override fun onReceive(context:Context?, intent:Intent?) { lockedSinceAuth=true;unlocked=false } },android.content.IntentFilter(Intent.ACTION_SCREEN_OFF))
+  if (android.os.Build.VERSION.SDK_INT >= 33) {
+   onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, OnBackInvokedCallback { handleAppBack() })
+  }
   authenticate() }
  private fun authenticate() {
   if (unlocked || prompting) return
@@ -794,7 +799,8 @@ shell.addView(bottomNav)
   root.addView(button(tr("Elimina cliente")) {AlertDialog.Builder(this).setMessage(tr("Eliminare definitivamente questo cliente e tutte le visite?")).setPositiveButton(tr("Elimina")){_,_->db.delete(code);showList()}.setNegativeButton(tr("Annulla"),null).show()})
  }
  @Deprecated("Android back navigation")
- override fun onBackPressed() {
+ override fun onBackPressed() { handleAppBack() }
+ private fun handleAppBack() {
   when(currentPage) {
    "options" -> showHome()
    "list" -> showHome()

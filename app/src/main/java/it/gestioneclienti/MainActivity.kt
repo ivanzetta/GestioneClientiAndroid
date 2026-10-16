@@ -208,7 +208,7 @@ class MainActivity: Activity() {
    orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER
    setPadding(dp(8),dp(6),dp(8),dp(6));setBackgroundColor(Color.WHITE)
   }
-  listOf(Triple(R.drawable.ic_nav_home,"Home","home"),Triple(R.drawable.ic_nav_clients,"Clienti","clients"),Triple(R.drawable.ic_nav_plan,"Pianifica","day"),Triple(R.drawable.ic_nav_settings,"Opzioni","options")).forEach { (symbol,label,key) ->
+  listOf(Triple(R.drawable.ic_nav_home,"Home","home"),Triple(R.drawable.ic_nav_clients,"Clienti","clients"),Triple(R.drawable.ic_action_calendar,"Pianifica","day"),Triple(R.drawable.ic_nav_settings,"Opzioni","options")).forEach { (symbol,label,key) ->
    val item=LinearLayout(this).apply {
     orientation=LinearLayout.VERTICAL;gravity=android.view.Gravity.CENTER
     setPadding(dp(5),dp(8),dp(5),dp(8))

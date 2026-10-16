@@ -1002,7 +1002,7 @@ shell.addView(bottomNav)
    if(key in infoKeys) return@forEachIndexed
    root.addView(homeText(tr(captions[index]),14f,true).apply {setPadding(0,dp(8),0,dp(3))})
    val field:EditText=if(key=="provincia") choiceField(key,provinceChoices) else if(key=="settore") choiceField(key,if(isGerman())sectorChoicesGerman else sectorChoicesItalian) else if(key=="zona") AutoCompleteTextView(this).apply { val choices=(db.zones()+listOf(existing[key].orEmpty())).filter { it.isNotBlank() }.distinct().sortedWith(String.CASE_INSENSITIVE_ORDER);setAdapter(ArrayAdapter(this@MainActivity,android.R.layout.simple_dropdown_item_1line,choices));threshold=0;setOnClickListener { showDropDown() };setOnFocusChangeListener { _,focused -> if(focused)showDropDown() } } else EditText(this)
-   field.apply{setText(existing[key] ?: "");setSingleLine(key!="note");if(key=="note")minLines=3; if(key.startsWith("telefono"))inputType=InputType.TYPE_CLASS_PHONE; if(key.startsWith("email"))inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS; textSize=15f;background=shape(Color.WHITE,softBorder);setPadding(dp(12),dp(8),dp(12),dp(8))}
+   field.apply{if(key!="provincia" && key!="settore")setText(existing[key] ?: "");setSingleLine(key!="note");if(key=="note")minLines=3; if(key.startsWith("telefono"))inputType=InputType.TYPE_CLASS_PHONE; if(key.startsWith("email"))inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS; textSize=15f;background=shape(Color.WHITE,softBorder);setPadding(dp(12),dp(8),dp(12),dp(8))}
    inputs[key]=field;root.addView(field,LinearLayout.LayoutParams(-1,if(key=="note")dp(108) else dp(48)))
   }
   editingFields=inputs
@@ -1176,7 +1176,7 @@ shell.addView(bottomNav)
     "tasks", "day" -> showHome()
    "suboptions" -> showOptions()
    "edit" -> {
-    val changed=editingFields.any { (key,field) -> field.text.toString() != (originalValues[key] ?: "") }
+    val changed=editingFields.any { (key,field) -> (if(key=="provincia" || key=="settore")field.text.toString().substringBefore(" – ").trim() else field.text.toString()) != (originalValues[key] ?: "") }
     val goBack:()->Unit={ if(editingCustomerCode==null) showList() else detail(editingCustomerCode!!) }
     if(changed) AlertDialog.Builder(this).setTitle(tr("Modifiche non salvate"))
      .setMessage(tr("Vuoi uscire senza salvare le modifiche?"))

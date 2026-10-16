@@ -564,8 +564,14 @@ shell.addView(bottomNav)
  }
  private fun showDay(day:LocalDate=selectedDay){
   selectedDay=day;screen("Pianifica giornata")
-  root.addView(button("← Home"){showHome()}.apply {minHeight=dp(40);minimumHeight=dp(40);textSize=14f;setPadding(dp(8),0,dp(8),0)},LinearLayout.LayoutParams(-1,dp(42)).apply {bottomMargin=dp(5)})
-  root.addView(secondaryButton("Data: "+formatDate(day.toString())){pickDate(day){showDay(it)}})
+  val dayToolbar=LinearLayout(this).apply {orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL}
+  dayToolbar.addView(button("← Home"){showHome()}.apply {
+   minHeight=dp(40);minimumHeight=dp(40);textSize=14f;setPadding(dp(8),0,dp(8),0)
+  },LinearLayout.LayoutParams(dp(105),dp(42)).apply {marginEnd=dp(8)})
+  dayToolbar.addView(secondaryButton("Data: "+formatDate(day.toString())){pickDate(day){showDay(it)}}.apply {
+   minHeight=dp(40);minimumHeight=dp(40);textSize=14f;setPadding(dp(8),0,dp(8),0)
+  },LinearLayout.LayoutParams(0,dp(42),1f))
+  root.addView(dayToolbar,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(14);bottomMargin=dp(12)})
   root.addView(primaryButton("+ Aggiungi cliente"){
    val allClients=db.allCustomers()
    val zones=db.zones().filter { it.isNotBlank() }

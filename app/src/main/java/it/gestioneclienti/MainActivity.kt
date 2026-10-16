@@ -515,7 +515,7 @@ shell.addView(bottomNav)
   val scheduled=db.tasks("visita").filter { it.date!=null && it.date<=day.toString() }
   // A customer present in both lists must only appear once.
   val scheduledCodes=scheduled.map { it.code }.toSet()
-  val items=(scheduled+manual.filter { it.code !in scheduledCodes }).filter { !db.hasVisit(it.code,day.toString()) }
+  val items=(scheduled+manual.filter { it.code !in scheduledCodes }).filter { !db.hasVisit(it.code,day.toString()) }.sortedWith(compareBy<Database.Task> { if(it.position>0)it.position else Int.MAX_VALUE }.thenBy { it.date })
   heading("Visite da effettuare · "+items.size)
   if(items.isEmpty())root.addView(homeCard(paleYellow).apply { addView(homeText("Nessuna visita da effettuare per questa data")) })
   items.forEachIndexed{index,task->
@@ -685,43 +685,44 @@ shell.addView(bottomNav)
   val customer=db.get(code) ?: run{showList();return}
   screen(customer["nome"].orEmpty())
   root.addView(button(tr("← Elenco clienti")){showList()})
-  val actionFields=setOf("telefono_principale","telefono_secondario","email_principale","email_secondaria")
-  fields.forEachIndexed { index,key ->
-   if (key in infoKeys) {
+  fun section(title:String,keys:List<String>) {
+   val visible=keys.filter { customer[it].orEmpty().isNotBlank() }
+   if(visible.isEmpty())return
+   root.addView(homeCard(paleYellow).apply { addView(homeText(title,18f,true)) })
+   visible.forEach { key ->
+    val value=customer[key].orEmpty().trim()
+    val index=fields.indexOf(key)
+    if(key.startsWith("telefono")) contactRow(captions[index],value,"☎") {
+     openExternal(Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+Uri.encode(value))))
+    } else if(key.startsWith("email")) contactRow(captions[index],value,"✉") {
+     openExternal(Intent(Intent.ACTION_SENDTO,Uri.parse("mailto:"+Uri.encode(value))))
+    } else root.addView(TextView(this).apply {
+     val label=tr(captions[index])+": "
+     text=android.text.SpannableString(label+value).apply {
+      setSpan(android.text.style.StyleSpan(Typeface.BOLD),label.length,length,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+     }
+     textSize=16f;setTextColor(ink);setPadding(0,dp(5),0,dp(5))
+    })
+   }
+  }
+  section("▣  Dati cliente",listOf("codice","nome","settore"))
+  section("⌖  Indirizzo e zona",listOf("indirizzo","cap","citta","provincia","zona"))
+  section("☎  Contatti",listOf("contatto_principale","telefono_principale","email_principale","contatto_secondario","telefono_secondario","email_secondaria"))
+  section("✎  Note",listOf("note"))
+  val customFields=infoKeys.filter { customInfo(it)!=null && customer[it].orEmpty().isNotBlank() }
+  if(customFields.isNotEmpty()) {
+   root.addView(homeCard(paleYellow).apply { addView(homeText("ⓘ  Info personalizzate",18f,true)) })
+   customFields.forEach { key ->
     root.addView(android.widget.CheckBox(this).apply {
-     text=infoLabel(key)
-     textSize=16f
+     text=infoLabel(key);textSize=16f
      isChecked=customer[key].equals("true",true) || customer[key]=="1"
      setOnCheckedChangeListener { check,checked ->
       check.isEnabled=false
-      try {
-       db.setCustomerInfo(code,key,checked)
-       check.isEnabled=true
-      } catch(e:Exception) {
-       check.setOnCheckedChangeListener(null)
-       check.isChecked=!checked
-       check.isEnabled=true
-       Toast.makeText(this@MainActivity,e.message ?: "Errore salvataggio",Toast.LENGTH_LONG).show()
-       detail(code)
-      }
+      try { db.setCustomerInfo(code,key,checked);check.isEnabled=true }
+      catch(e:Exception) { Toast.makeText(this@MainActivity,e.message,Toast.LENGTH_LONG).show();detail(code) }
      }
     })
-   } else if(key !in actionFields) root.addView(TextView(this).apply {
-    val label=tr(captions[index])+": "
-    val value=customer[key].orEmpty()
-    text=android.text.SpannableString(label+value).apply {
-     setSpan(android.text.style.StyleSpan(Typeface.BOLD),label.length,length,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-    }
-    textSize=16f;setPadding(0,5,0,5)
-   })
-  }
-  listOf("telefono_principale","telefono_secondario").forEach { key ->
-   val number=customer[key].orEmpty().trim()
-   contactRow(captions[fields.indexOf(key)],number,"☎") { openExternal(Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+Uri.encode(number)))) }
-  }
-  listOf("email_principale","email_secondaria").forEach { key ->
-   val email=customer[key].orEmpty().trim()
-   contactRow(captions[fields.indexOf(key)],email,"✉") { openExternal(Intent(Intent.ACTION_SENDTO,Uri.parse("mailto:"+Uri.encode(email)))) }
+   }
   }
   val destination=listOf("indirizzo","cap","citta","provincia").map { customer[it].orEmpty().trim() }.filter { it.isNotBlank() }.joinToString(", ")
   val actionRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;setPadding(0,dp(8),0,dp(8)) }

@@ -50,7 +50,7 @@ jobs:
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/yellowkunde-upload.jks"
 
           AAB="app/build/outputs/bundle/release/app-release.aab"
-          VERSION_NAME=$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -n 1)
+          VERSION_NAME=$(sed -nE 's/.*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -n 1)
           test -n "$VERSION_NAME" || { echo "versionName non trovato"; exit 1; }
           SIGNED_AAB="app/build/outputs/bundle/release/YellowKunde-${VERSION_NAME}-signed.aab"
 

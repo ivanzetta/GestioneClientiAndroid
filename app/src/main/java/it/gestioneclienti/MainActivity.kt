@@ -208,14 +208,14 @@ class MainActivity: Activity() {
    orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER
    setPadding(dp(8),dp(6),dp(8),dp(6));setBackgroundColor(Color.WHITE)
   }
-  listOf(Triple("⌂","Home","home"),Triple("♟","Clienti","clients"),Triple("▣","Pianifica","day"),Triple("⚙","Opzioni","options")).forEach { (symbol,label,key) ->
+  listOf(Triple(R.drawable.ic_nav_home,"Home","home"),Triple(R.drawable.ic_nav_clients,"Clienti","clients"),Triple(R.drawable.ic_nav_plan,"Pianifica","day"),Triple(R.drawable.ic_nav_settings,"Opzioni","options")).forEach { (symbol,label,key) ->
    val item=LinearLayout(this).apply {
     orientation=LinearLayout.VERTICAL;gravity=android.view.Gravity.CENTER
     setPadding(dp(5),dp(8),dp(5),dp(8))
     background=shape(if(active==key)Color.rgb(255,243,204) else Color.WHITE)
     contentDescription=label
    }
-   item.addView(homeText(symbol,24f,true,if(active==key)Color.rgb(190,131,0) else ink).apply {gravity=android.view.Gravity.CENTER})
+   item.addView(android.widget.ImageView(this).apply {setImageResource(symbol);contentDescription=label;scaleType=android.widget.ImageView.ScaleType.FIT_CENTER;setColorFilter(if(active==key)Color.rgb(190,131,0) else ink)},LinearLayout.LayoutParams(dp(25),dp(25)).apply {gravity=android.view.Gravity.CENTER_HORIZONTAL})
    item.addView(homeText(label,13f,active==key).apply {gravity=android.view.Gravity.CENTER})
    item.setOnClickListener { when(key) { "home"->showHome(); "clients"->showList(""); "day"->showDay(); else->showOptions() } }
    nav.addView(item,LinearLayout.LayoutParams(0,dp(66),1f))
@@ -249,7 +249,7 @@ class MainActivity: Activity() {
        scaleType=android.widget.ImageView.ScaleType.FIT_CENTER
       },LinearLayout.LayoutParams(dp(25),dp(25)).apply {gravity=android.view.Gravity.CENTER_HORIZONTAL})
      } else {
-      addView(homeText(info[0],21f,true).apply{gravity=android.view.Gravity.CENTER})
+      addView(android.widget.ImageView(this@MainActivity).apply {setImageResource(R.drawable.ic_home_reminder);contentDescription="Promemoria";scaleType=android.widget.ImageView.ScaleType.FIT_CENTER},LinearLayout.LayoutParams(dp(25),dp(25)).apply {gravity=android.view.Gravity.CENTER_HORIZONTAL})
      }
      addView(homeText("${matching.size}",27f,true).apply{gravity=android.view.Gravity.CENTER})
      addView(homeText(info[1],14f,true).apply{gravity=android.view.Gravity.CENTER})

@@ -858,14 +858,24 @@ shell.addView(bottomNav)
    text="Note attività completate:\n"+completed.joinToString("\n") { "• "+(if(it.type=="contatto")"Telefonata" else "Visita")+": "+it.notes }
    textSize=15f;setPadding(0,dp(8),0,dp(12))
   })
-  root.addView(button(tr("Registra visita (oggi)")){try { db.visit(code);detail(code) } catch(e:Exception){Toast.makeText(this,e.message,Toast.LENGTH_LONG).show()} })
-  root.addView(button(tr("Registra visita dal calendario")) {
+  val visitActions=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL}
+  fun visitRow():LinearLayout=LinearLayout(this).apply {orientation=LinearLayout.HORIZONTAL}
+  val visitRow1=visitRow()
+  val visitRow2=visitRow()
+  fun addVisitAction(row:LinearLayout,label:String,action:()->Unit) {
+   row.addView(secondaryButton(label,action).apply {
+    textSize=13f;setPadding(dp(5),dp(8),dp(5),dp(8))
+    minHeight=dp(56);minimumHeight=dp(56)
+   },LinearLayout.LayoutParams(0,dp(64),1f).apply {marginEnd=dp(5);bottomMargin=dp(5)})
+  }
+  addVisitAction(visitRow1,tr("Registra visita (oggi)")){try { db.visit(code);detail(code) } catch(e:Exception){Toast.makeText(this,e.message,Toast.LENGTH_LONG).show()} }
+  addVisitAction(visitRow1,tr("Registra visita dal calendario")) {
    pickDate { date ->
     try { db.visit(code,date);detail(code) }
     catch(e:Exception) { Toast.makeText(this,e.message ?: tr("Errore"),Toast.LENGTH_LONG).show() }
    }
-  })
-  root.addView(button(tr("Modifica data visita")) {
+  }
+  addVisitAction(visitRow2,tr("Modifica data visita")) {
    val entries=db.visitEntries(code)
    if(entries.isEmpty()) Toast.makeText(this,tr("Nessuna visita registrata"),Toast.LENGTH_SHORT).show()
    else AlertDialog.Builder(this).setTitle(tr("Seleziona visita"))
@@ -876,11 +886,16 @@ shell.addView(bottomNav)
       catch(e:Exception) { Toast.makeText(this,e.message ?: tr("Errore"),Toast.LENGTH_LONG).show() }
      }
     }.setNegativeButton(tr("Annulla"),null).show()
-  })
-  root.addView(button(tr("Annulla ultima visita")) {AlertDialog.Builder(this).setMessage(tr("Eliminare l'ultima visita registrata?")).setPositiveButton(tr("Sì")){_,_->db.undoLastVisit(code);detail(code)}.setNegativeButton(tr("No"),null).show()})
+  }
+  addVisitAction(visitRow2,tr("Annulla ultima visita")) {AlertDialog.Builder(this).setMessage(tr("Eliminare l'ultima visita registrata?")).setPositiveButton(tr("Sì")){_,_->db.undoLastVisit(code);detail(code)}.setNegativeButton(tr("No"),null).show()}
+  visitActions.addView(visitRow1)
+  visitActions.addView(visitRow2)
+  root.addView(visitActions)
   heading("Promemoria cliente")
-  root.addView(secondaryButton("Pianifica visita (con note)"){editTask(code,"visita")})
-  root.addView(secondaryButton("Da contattare (con note)"){editTask(code,"contatto")})
+  val reminderRow=LinearLayout(this).apply {orientation=LinearLayout.HORIZONTAL}
+  reminderRow.addView(primaryButton("Pianifica visita"){editTask(code,"visita")}.apply {background=shape(Color.rgb(51,207,91));textSize=14f},LinearLayout.LayoutParams(0,dp(52),1f).apply {marginEnd=dp(5)})
+  reminderRow.addView(primaryButton("Promemoria"){editTask(code,"contatto")}.apply {background=shape(Color.rgb(49,139,250));setTextColor(Color.WHITE);textSize=14f},LinearLayout.LayoutParams(0,dp(52),1f))
+  root.addView(reminderRow)
 
  }
  @Deprecated("Android back navigation")

@@ -690,7 +690,19 @@ shell.addView(bottomNav)
  private fun detail(code:String) {
   val customer=db.get(code) ?: run{showList();return}
   screen(customer["nome"].orEmpty())
-  root.addView(button(tr("← Elenco clienti")){showList()})
+  val detailToolbar=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
+  detailToolbar.addView(button(tr("← Elenco clienti")){showList()},LinearLayout.LayoutParams(0,dp(56),1f).apply {marginEnd=dp(6)})
+  fun detailAction(icon:Int,description:String,action:()->Unit) {
+   detailToolbar.addView(homeIconAction(icon,description,action),LinearLayout.LayoutParams(dp(54),dp(54)).apply {marginStart=dp(5)})
+  }
+  detailAction(android.R.drawable.ic_menu_edit,"Modifica cliente"){edit(code)}
+  detailAction(android.R.drawable.ic_menu_delete,"Elimina cliente"){
+   AlertDialog.Builder(this).setTitle(tr("Elimina cliente"))
+    .setMessage(tr("Eliminare definitivamente questo cliente e tutte le visite?"))
+    .setNegativeButton(tr("Annulla"),null)
+    .setPositiveButton(tr("Elimina")){_,_->db.delete(code);showList()}.show()
+  }
+  root.addView(detailToolbar)
   fun section(title:String,keys:List<String>) {
    val visible=keys.filter { customer[it].orEmpty().isNotBlank() }
    if(visible.isEmpty())return
@@ -795,8 +807,7 @@ shell.addView(bottomNav)
   heading("Promemoria cliente")
   root.addView(secondaryButton("Pianifica visita (con note)"){editTask(code,"visita")})
   root.addView(secondaryButton("Da contattare (con note)"){editTask(code,"contatto")})
-  root.addView(button(tr("Modifica cliente")){edit(code)})
-  root.addView(button(tr("Elimina cliente")) {AlertDialog.Builder(this).setMessage(tr("Eliminare definitivamente questo cliente e tutte le visite?")).setPositiveButton(tr("Elimina")){_,_->db.delete(code);showList()}.setNegativeButton(tr("Annulla"),null).show()})
+
  }
  @Deprecated("Android back navigation")
  override fun onBackPressed() { handleAppBack() }

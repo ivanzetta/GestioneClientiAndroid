@@ -63,6 +63,7 @@ class MainActivity: Activity() {
  private var editingFields:Map<String,EditText> = emptyMap()
  private var originalValues:Map<String,String> = emptyMap()
  private var listFiltersVisible=false
+ private var listInfoVisible=false
  private var listSearch=""
  private var listZone=""
  private var listScrollY=0
@@ -337,7 +338,7 @@ shell.addView(bottomNav)
    })
   }
   val infoContainer=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
-  val toggleFilters:()->Unit={listFiltersVisible=!listFiltersVisible;infoContainer.visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE}
+  val toggleFilters:()->Unit={listFiltersVisible=!listFiltersVisible;infoContainer.visibility=if(listInfoVisible) android.view.View.VISIBLE else android.view.View.GONE}
   filterButtons.removeAllViews()
   val firstRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
   fun addSquare(row:LinearLayout,label:String,action:()->Unit) {
@@ -349,14 +350,14 @@ shell.addView(bottomNav)
   addSquare(firstRow,"☷",toggleFilters)
   addSquare(firstRow,"↕",{sortAction()})
   addSquare(firstRow,"◎",{zoneAction.performClick()})
-   addSquare(firstRow,"ⓘ",{toggleFilters()})
+   addSquare(firstRow,"ⓘ",{listInfoVisible=!listInfoVisible;infoContainer.visibility=if(listInfoVisible) android.view.View.VISIBLE else android.view.View.GONE})
   filterButtons.addView(firstRow)
   infoActions.chunked(4).forEach { chunk ->
    val row=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
    chunk.forEach { (label,action) -> addSquare(row,label) { action() } }
    infoContainer.addView(row)
   }
-  infoContainer.visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE
+  infoContainer.visibility=if(listInfoVisible) android.view.View.VISIBLE else android.view.View.GONE
   filterButtons.addView(infoContainer)
   searchBar.addView(filterButtons)
   root.addView(searchBar)

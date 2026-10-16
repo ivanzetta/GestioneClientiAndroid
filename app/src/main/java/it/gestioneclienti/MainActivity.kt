@@ -352,7 +352,7 @@ shell.addView(bottomNav)
   filterButtons.addView(firstRow)
   infoActions.chunked(4).forEach { chunk ->
    val row=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
-   chunk.forEach { (label,action) -> addSquare(row,label,action) }
+   chunk.forEach { (label,action) -> addSquare(row,label) { action() } }
    infoContainer.addView(row)
   }
   infoContainer.visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE

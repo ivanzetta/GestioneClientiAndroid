@@ -486,7 +486,15 @@ shell.addView(bottomNav)
  }
  private fun editTask(code:String,type:String) {
   val current=db.tasks(type).firstOrNull{it.code==code}
-  val note=EditText(this).apply{hint="Note";setText(current?.notes.orEmpty());minLines=3}
+  val note=EditText(this).apply {
+   hint="Note"
+   inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+   setSingleLine(false)
+   minLines=4
+   maxLines=8
+   gravity=android.view.Gravity.TOP or android.view.Gravity.START
+   setText(current?.notes.orEmpty())
+  }
   var date=current?.date
   val wrapper=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(20),dp(8),dp(20),0)}
   val dateButton=Button(this).apply{text="Data: "+(date?.let{formatDate(it)}?:"da definire")}

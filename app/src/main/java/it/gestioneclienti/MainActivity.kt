@@ -1170,6 +1170,20 @@ shell.addView(bottomNav)
   reminderRow.addView(primaryButton("Pianifica visita"){editTask(code,"visita")}.apply {background=shape(Color.rgb(51,207,91));textSize=14f},LinearLayout.LayoutParams(0,dp(52),1f).apply {marginEnd=dp(5)})
   reminderRow.addView(primaryButton("Promemoria"){editTask(code,"contatto")}.apply {background=shape(Color.rgb(49,139,250));setTextColor(Color.WHITE);textSize=14f},LinearLayout.LayoutParams(0,dp(52),1f))
   root.addView(reminderRow)
+  val clientReminders=db.tasks("contatto").filter { it.code==code }
+  if(clientReminders.isEmpty()) {
+   root.addView(homeText("Nessun promemoria attivo",14f,false,Color.DKGRAY))
+  } else {
+   clientReminders.forEach { reminder ->
+    val dateLabel=reminder.date?.let { formatDate(it) } ?: "Senza data"
+    val noteLabel=reminder.notes.ifBlank { "Nessuna nota" }
+    root.addView(secondaryButton("Promemoria · "+dateLabel+"\n"+noteLabel) { editTask(code,"contatto") }.apply {
+     gravity=android.view.Gravity.CENTER_VERTICAL or android.view.Gravity.START
+     textSize=14f
+     setPadding(dp(14),dp(10),dp(14),dp(10))
+    },LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(8)})
+   }
+  }
 
  }
  @Deprecated("Android back navigation")

@@ -600,8 +600,8 @@ shell.addView(bottomNav)
   if(items.isEmpty())root.addView(homeCard(paleYellow).apply { addView(homeText("Nessuna visita da effettuare per questa data")) })
   items.forEachIndexed{index,task->
    val overdue=task.date!=null && task.date<day.toString() && task.type=="visita"
-   val label=if(task.type=="visita") (if(overdue)"⚠ Visita scaduta · " else "Visita programmata · ") +formatDate(task.date.orEmpty()) else "Aggiunta al giro"
-   root.addView(secondaryButton("${index+1}. ${task.name}\n${label}\n${task.notes}"){detail(task.code)})
+   val label=if(task.type=="visita") (if(overdue)"⚠ Visita scaduta · " else "Visita programmata · ") +formatDate(task.date.orEmpty()) else ""
+   root.addView(secondaryButton(listOf("${index+1}. ${task.name}",label,task.notes).filter { it.isNotBlank() }.joinToString("\n")){detail(task.code)})
    val row=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
    fun small(symbol:String,description:String,bg:Int,fg:Int,enabled:Boolean=true,action:()->Unit) {
     row.addView(TextView(this).apply {

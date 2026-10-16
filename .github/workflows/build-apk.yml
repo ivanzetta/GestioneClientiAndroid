@@ -50,7 +50,9 @@ jobs:
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/yellowkunde-upload.jks"
 
           AAB="app/build/outputs/bundle/release/app-release.aab"
-          SIGNED_AAB="app/build/outputs/bundle/release/YellowKunde-0.9.4-signed.aab"
+          VERSION_NAME=$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -n 1)
+          test -n "$VERSION_NAME" || { echo "versionName non trovato"; exit 1; }
+          SIGNED_AAB="app/build/outputs/bundle/release/YellowKunde-${VERSION_NAME}-signed.aab"
 
           jarsigner \
             -keystore "$RUNNER_TEMP/yellowkunde-upload.jks" \
@@ -60,11 +62,11 @@ jobs:
             "$AAB" "$KEY_ALIAS"
 
           jarsigner -verify "$SIGNED_AAB"
-          echo "AAB firmato e verificato."
+          echo "AAB firmato e verificato: $SIGNED_AAB"
 
       - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
         with:
           name: YellowKunde-AAB-Release-Firmato
-          path: app/build/outputs/bundle/release/YellowKunde-0.9.4-signed.aab
+          path: app/build/outputs/bundle/release/YellowKunde-*-signed.aab
           if-no-files-found: error

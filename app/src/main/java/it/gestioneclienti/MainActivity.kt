@@ -750,12 +750,12 @@ shell.addView(bottomNav)
   fields.forEachIndexed{index,key->
    if(key=="info1") root.addView(TextView(this).apply{text="Informazioni aggiuntive";textSize=19f;typeface=Typeface.DEFAULT_BOLD})
    if(key in infoKeys) { val check=android.widget.CheckBox(this).apply { text=infoLabel(key);isChecked=existing[key].equals("true",true) || existing[key]=="1" };checks[key]=check;root.addView(check);return@forEachIndexed }
-   root.addView(TextView(this).apply{text=tr(captions[index])})
-   val field=EditText(this).apply{setText(existing[key] ?: "");setSingleLine(key!="note");if(key=="note")minLines=3; if(key.startsWith("telefono"))inputType=InputType.TYPE_CLASS_PHONE; if(key.startsWith("email"))inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS}
-   inputs[key]=field;root.addView(field)
+   root.addView(homeText(tr(captions[index]),14f,true).apply {setPadding(0,dp(8),0,dp(3))})
+   val field=EditText(this).apply{setText(existing[key] ?: "");setSingleLine(key!="note");if(key=="note")minLines=3; if(key.startsWith("telefono"))inputType=InputType.TYPE_CLASS_PHONE; if(key.startsWith("email"))inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS; textSize=15f;background=shape(Color.WHITE,softBorder);setPadding(dp(12),dp(8),dp(12),dp(8))}
+   inputs[key]=field;root.addView(field,LinearLayout.LayoutParams(-1,if(key=="note")dp(108) else dp(48)))
   }
   editingFields=inputs
-  root.addView(button(tr("Salva")){
+  root.addView(primaryButton(tr("Salva")){
    try {db.save(code,inputs.mapValues{it.value.text.toString()} + checks.mapValues { if(it.value.isChecked) "true" else "false" });detail(inputs.getValue("codice").text.toString().trim())}
    catch(e:Exception){Toast.makeText(this,e.message ?: tr("Errore"),Toast.LENGTH_LONG).show()}
   })

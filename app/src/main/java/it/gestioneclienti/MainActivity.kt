@@ -789,7 +789,8 @@ shell.addView(bottomNav)
    if(key=="info1") root.addView(TextView(this).apply{text="Informazioni aggiuntive";textSize=19f;typeface=Typeface.DEFAULT_BOLD})
    if(key in infoKeys) { val check=android.widget.CheckBox(this).apply { text=infoLabel(key);isChecked=existing[key].equals("true",true) || existing[key]=="1" };checks[key]=check;root.addView(check);return@forEachIndexed }
    root.addView(homeText(tr(captions[index]),14f,true).apply {setPadding(0,dp(8),0,dp(3))})
-   val field=EditText(this).apply{setText(existing[key] ?: "");setSingleLine(key!="note");if(key=="note")minLines=3; if(key.startsWith("telefono"))inputType=InputType.TYPE_CLASS_PHONE; if(key.startsWith("email"))inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS; textSize=15f;background=shape(Color.WHITE,softBorder);setPadding(dp(12),dp(8),dp(12),dp(8))}
+   val field:EditText=if(key=="zona") AutoCompleteTextView(this).apply { val choices=(db.zones()+listOf(existing[key].orEmpty())).filter { it.isNotBlank() }.distinct().sortedWith(String.CASE_INSENSITIVE_ORDER);setAdapter(ArrayAdapter(this@MainActivity,android.R.layout.simple_dropdown_item_1line,choices));threshold=0;setOnClickListener { showDropDown() };setOnFocusChangeListener { _,focused -> if(focused)showDropDown() } } else EditText(this)
+   field.apply{setText(existing[key] ?: "");setSingleLine(key!="note");if(key=="note")minLines=3; if(key.startsWith("telefono"))inputType=InputType.TYPE_CLASS_PHONE; if(key.startsWith("email"))inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS; textSize=15f;background=shape(Color.WHITE,softBorder);setPadding(dp(12),dp(8),dp(12),dp(8))}
    inputs[key]=field;root.addView(field,LinearLayout.LayoutParams(-1,if(key=="note")dp(108) else dp(48)))
   }
   editingFields=inputs

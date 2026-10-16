@@ -237,7 +237,7 @@ class MainActivity: Activity() {
    val tiles=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
    pair.forEachIndexed { i,info ->
     val type=info[2];val period=info[3]
-    val matching=tasks.filter { (it.type==type || (type=="visita" && it.type=="giro")) && it.date!=null && (if(period=="today") it.date<=now.toString() else it.date>now.toString()) }.distinctBy { it.code to it.date }
+    val matching=tasks.filter { (it.type==type || (type=="visita" && it.type=="giro")) && (if(period=="today") (it.date!=null && it.date<=now.toString()) || (type=="contatto" && it.date==null) else it.date!=null && it.date>now.toString()) }.distinctBy { it.code to it.date }
     val overdue=matching.count { it.date!!<now.toString() }
     val card=homeCard(if(type=="visita")Color.rgb(255,246,218) else Color.rgb(225,241,255)).apply {
      gravity=android.view.Gravity.CENTER
@@ -529,7 +529,7 @@ shell.addView(bottomNav)
   heading(if(type=="visita")"Visite" else "Da contattare")
   val today=LocalDate.now().toString()
   val activityList=if(type=="visita") db.tasks().filter { it.type=="visita" || it.type=="giro" } else db.tasks(type)
-  activityList.filter {task-> when(period){"today"->task.date!=null && task.date<=today;"future"->task.date!=null && task.date>today;else->true} }.distinctBy { it.code to it.date }.forEach {task->
+  activityList.filter {task-> when(period){"today"->(task.date!=null && task.date<=today) || (type=="contatto" && task.date==null);"future"->task.date!=null && task.date>today;else->true} }.distinctBy { it.code to it.date }.forEach {task->
    val overdue=task.date!=null && task.date<today
    val prefix=if(overdue)"⚠ SCADUTA · " else ""
    root.addView(secondaryButton(prefix+task.name+" · "+(task.date?.let{formatDate(it)}?:"Senza data")+"\n"+task.notes){detail(task.code)})

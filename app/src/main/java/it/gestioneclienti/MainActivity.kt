@@ -242,7 +242,15 @@ class MainActivity: Activity() {
     val card=homeCard(if(type=="visita")Color.rgb(255,246,218) else Color.rgb(225,241,255)).apply {
      gravity=android.view.Gravity.CENTER
      setPadding(dp(8),dp(5),dp(8),dp(5))
-     addView(homeText(info[0],21f,true).apply{gravity=android.view.Gravity.CENTER})
+     if(type=="visita") {
+      addView(android.widget.ImageView(this@MainActivity).apply {
+       setImageResource(R.drawable.ic_action_calendar)
+       contentDescription="Visite"
+       scaleType=android.widget.ImageView.ScaleType.FIT_CENTER
+      },LinearLayout.LayoutParams(dp(25),dp(25)).apply {gravity=android.view.Gravity.CENTER_HORIZONTAL})
+     } else {
+      addView(homeText(info[0],21f,true).apply{gravity=android.view.Gravity.CENTER})
+     }
      addView(homeText("${matching.size}",27f,true).apply{gravity=android.view.Gravity.CENTER})
      addView(homeText(info[1],14f,true).apply{gravity=android.view.Gravity.CENTER})
      if(overdue>0)addView(homeText("⚠ $overdue scadute",12f,true,Color.rgb(180,40,30)).apply{gravity=android.view.Gravity.CENTER})

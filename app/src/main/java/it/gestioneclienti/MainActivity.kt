@@ -523,19 +523,32 @@ shell.addView(bottomNav)
    val label=if(task.type=="visita") (if(overdue)"⚠ Visita scaduta · " else "Visita programmata · ") +formatDate(task.date.orEmpty()) else "Aggiunta al giro"
    root.addView(secondaryButton("${index+1}. ${task.name}\n${label}\n${task.notes}"){detail(task.code)})
    val row=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
-   fun small(text:String,action:()->Unit){row.addView(Button(this).apply{
-    this.text=text;isAllCaps=false;textSize=13f;setTextColor(ink)
-    background=shape(if(text.startsWith("✓"))Color.rgb(255,216,91) else Color.WHITE,softBorder);setOnClickListener{action()}
-   },LinearLayout.LayoutParams(0,dp(48),1f).apply {marginEnd=dp(4)})}
-   if(task.type=="giro") {
-    val manualItems=manual.filter { it.code !in scheduledCodes }
-    val manualIndex=manualItems.indexOfFirst { it.id==task.id }
-    small("↑"){if(manualIndex>0){db.swapDayTasks(task,manualItems[manualIndex-1]);showDay(day)}}
-    small("↓"){if(manualIndex>=0 && manualIndex<manualItems.lastIndex){db.swapDayTasks(task,manualItems[manualIndex+1]);showDay(day)}}
+   fun small(symbol:String,description:String,bg:Int,fg:Int,enabled:Boolean=true,action:()->Unit) {
+    row.addView(TextView(this).apply {
+     text=symbol;textSize=23f;gravity=android.view.Gravity.CENTER
+     setTextColor(fg);contentDescription=description;background=shape(bg)
+     alpha=if(enabled)1f else .35f;isEnabled=enabled;setOnClickListener { action() }
+    },LinearLayout.LayoutParams(0,dp(44),1f).apply { marginEnd=dp(4) })
    }
-   small("Note"){val input=EditText(this).apply{setText(task.notes)};AlertDialog.Builder(this).setTitle("Note visita").setView(input).setNegativeButton("Annulla",null).setPositiveButton("Salva"){_,_->db.changeTaskNote(task.id,input.text.toString());showDay(day)}.show()}
-   small("✓ Conferma"){AlertDialog.Builder(this).setTitle("Conferma visita").setMessage("Confermi che la visita a ${task.name} è stata effettuata?").setNegativeButton("Indietro",null).setPositiveButton("Conferma"){_,_->db.completeDayVisit(task.id,day.toString());showDay(day)}.show()}
-   small("× Annulla"){AlertDialog.Builder(this).setTitle("Annullare questa visita?").setMessage("La visita programmata verrà eliminata definitivamente, senza registrarla nello storico.").setNegativeButton("Torna indietro",null).setPositiveButton("Elimina visita"){_,_->db.cancelDayVisit(task.id,day.toString());showDay(day)}.show()}
+   small("✓","Conferma visita",Color.rgb(229,244,233),Color.rgb(38,115,69)) {
+    AlertDialog.Builder(this).setTitle("Conferma visita").setMessage("Confermi che la visita a ${task.name} è stata effettuata?")
+     .setNegativeButton("Indietro",null).setPositiveButton("Conferma"){_,_->db.completeDayVisit(task.id,day.toString());showDay(day)}.show()
+   }
+   small("×","Annulla visita",Color.rgb(251,232,232),Color.rgb(180,60,60)) {
+    AlertDialog.Builder(this).setTitle("Annulla visita").setMessage("La visita programmata verrà eliminata definitivamente, senza registrarla nello storico.")
+     .setNegativeButton("Indietro",null).setPositiveButton("Elimina visita"){_,_->db.cancelDayVisit(task.id,day.toString());showDay(day)}.show()
+   }
+   small("↑","Sposta su",Color.rgb(255,241,184),Color.rgb(115,88,0),index>0) {
+    val order=items.map { it.code }.toMutableList();java.util.Collections.swap(order,index,index-1);db.reorderDayClients(day.toString(),order);showDay(day)
+   }
+   small("↓","Sposta giù",Color.rgb(255,241,184),Color.rgb(115,88,0),index<items.lastIndex) {
+    val order=items.map { it.code }.toMutableList();java.util.Collections.swap(order,index,index+1);db.reorderDayClients(day.toString(),order);showDay(day)
+   }
+   small("✎","Note",Color.rgb(233,239,251),Color.rgb(49,92,154)) {
+    val input=EditText(this).apply{setText(task.notes)}
+    AlertDialog.Builder(this).setTitle("Note visita").setView(input).setNegativeButton("Annulla",null)
+     .setPositiveButton("Salva"){_,_->db.changeTaskNote(task.id,input.text.toString());showDay(day)}.show()
+   }
    root.addView(row)
   }
   root.addView(secondaryButton("Aggiungi giro al calendario"){

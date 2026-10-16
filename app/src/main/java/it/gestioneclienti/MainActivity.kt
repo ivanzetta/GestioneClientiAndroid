@@ -513,12 +513,43 @@ shell.addView(bottomNav)
   root.addView(button("← Home"){showHome()})
   root.addView(secondaryButton("Data: "+formatDate(day.toString())){pickDate(day){showDay(it)}})
   root.addView(primaryButton("+ Aggiungi cliente"){
-   val clients=db.allCustomers()
-   val names=clients.map{it["nome"].orEmpty()+" · "+it["codice"].orEmpty()}.toTypedArray()
-   AlertDialog.Builder(this).setTitle("Scegli cliente").setItems(names){_,index->
-    val code=clients[index]["codice"].orEmpty()
-    try{db.addDayClient(code,day.toString());showDay(day)}catch(e:Exception){Toast.makeText(this,e.message,Toast.LENGTH_LONG).show()}
-   }.setNegativeButton("Annulla",null).show()
+   val allClients=db.allCustomers()
+   val zones=db.zones().filter { it.isNotBlank() }
+   val zoneLabels=(zones+listOf("Senza zona")).toTypedArray()
+   AlertDialog.Builder(this).setTitle("Seleziona zona")
+    .setItems(zoneLabels){_,zoneIndex->
+     val zone=if(zoneIndex==zones.size) "" else zones[zoneIndex]
+     val clients=allClients.filter { it["zona"].orEmpty().trim()==zone }
+     if(clients.isEmpty()) {
+      Toast.makeText(this,"Nessun cliente in questa zona",Toast.LENGTH_SHORT).show()
+     } else {
+      val selected=BooleanArray(clients.size)
+      val names=clients.map { it["nome"].orEmpty()+" · "+it["codice"].orEmpty() }.toTypedArray()
+      AlertDialog.Builder(this).setTitle("Clienti · "+zoneLabels[zoneIndex])
+       .setMultiChoiceItems(names,selected){_,index,checked->selected[index]=checked}
+       .setNegativeButton("Annulla",null)
+       .setPositiveButton("Aggiungi selezionati"){_,_->
+        var added=0
+        val skipped=mutableListOf<String>()
+        clients.forEachIndexed { index,customer ->
+         if(selected[index]) {
+          try {
+           db.addDayClient(customer["codice"].orEmpty(),day.toString())
+           added++
+          } catch(e:Exception) {
+           skipped.add(customer["nome"].orEmpty()+": "+(e.message ?: "già presente"))
+          }
+         }
+        }
+        showDay(day)
+        if(skipped.isNotEmpty()) AlertDialog.Builder(this)
+         .setTitle("Aggiunti: "+added+" · Non aggiunti: "+skipped.size)
+         .setMessage(skipped.joinToString("\n"))
+         .setPositiveButton("OK",null).show()
+        else if(added>0) Toast.makeText(this,"Aggiunti "+added+" clienti",Toast.LENGTH_SHORT).show()
+       }.show()
+     }
+    }.setNegativeButton("Annulla",null).show()
   })
   val manual=db.tasks("giro",day.toString())
   val scheduled=db.tasks("visita").filter { it.date!=null && it.date<=day.toString() }

@@ -1033,7 +1033,7 @@ shell.addView(bottomNav)
     .setNegativeButton(tr("Annulla"),null)
     .setPositiveButton(tr("Elimina")){_,_->db.delete(code);showList()}.show()
   }
-  root.addView(detailToolbar)
+  root.addView(detailToolbar,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(10);bottomMargin=dp(14)})
   fun detailCard(title:String):LinearLayout {
    val card=LinearLayout(this).apply {
     orientation=LinearLayout.VERTICAL

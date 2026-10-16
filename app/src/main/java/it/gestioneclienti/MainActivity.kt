@@ -1028,24 +1028,41 @@ shell.addView(bottomNav)
     .setPositiveButton(tr("Elimina")){_,_->db.delete(code);showList()}.show()
   }
   root.addView(detailToolbar)
+  fun detailCard(title:String):LinearLayout {
+   val card=LinearLayout(this).apply {
+    orientation=LinearLayout.VERTICAL
+    background=shape(Color.WHITE,softBorder)
+    setPadding(dp(10),dp(10),dp(10),dp(12))
+   }
+   card.addView(homeText(title,17f,true).apply {
+    background=shape(paleYellow)
+    setPadding(dp(12),dp(10),dp(12),dp(10))
+   })
+   root.addView(card,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=dp(10)})
+   return card
+  }
   fun section(title:String,keys:List<String>) {
    val visible=keys.filter { customer[it].orEmpty().isNotBlank() }
    if(visible.isEmpty())return
-   root.addView(homeCard(paleYellow).apply { addView(homeText(title,18f,true)) })
+   val card=detailCard(title)
    visible.forEach { key ->
     val value=customer[key].orEmpty().trim()
     val index=fields.indexOf(key)
-    if(key.startsWith("telefono")) contactRow(captions[index],value,"☎") {
-     openExternal(Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+Uri.encode(value))))
-    } else if(key.startsWith("email")) contactRow(captions[index],value,"✉") {
-     openExternal(Intent(Intent.ACTION_SENDTO,Uri.parse("mailto:"+Uri.encode(value))))
-    } else root.addView(TextView(this).apply {
-     val label=tr(captions[index])+": "
-     text=android.text.SpannableString(label+value).apply {
-      setSpan(android.text.style.StyleSpan(Typeface.BOLD),label.length,length,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-     }
-     textSize=16f;setTextColor(ink);setPadding(0,dp(5),0,dp(5))
-    })
+    val line=LinearLayout(this).apply {
+     orientation=LinearLayout.HORIZONTAL
+     gravity=android.view.Gravity.CENTER_VERTICAL
+     setPadding(dp(5),dp(7),dp(5),dp(7))
+    }
+    line.addView(homeText(tr(captions[index]),14f,true).apply {setTextColor(Color.DKGRAY)},LinearLayout.LayoutParams(0,-2,0.42f))
+    line.addView(homeText(value,15f,false),LinearLayout.LayoutParams(0,-2,0.58f))
+    if(key.startsWith("telefono") || key.startsWith("email")) {
+     val isPhone=key.startsWith("telefono")
+     line.addView(iconButton(if(isPhone)"☎" else "✉",tr(captions[index])) {
+      if(isPhone)openExternal(Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+Uri.encode(value))))
+      else openExternal(Intent(Intent.ACTION_SENDTO,Uri.parse("mailto:"+Uri.encode(value))))
+     })
+    }
+    card.addView(line)
    }
   }
   section("▣  Dati cliente",listOf("codice","nome","settore"))
@@ -1054,9 +1071,9 @@ shell.addView(bottomNav)
   section("✎  Note",listOf("note"))
   val customFields=infoKeys.filter { customInfo(it)!=null && customer[it].orEmpty().isNotBlank() }
   if(customFields.isNotEmpty()) {
-   root.addView(homeCard(paleYellow).apply { addView(homeText("ⓘ  Info personalizzate",18f,true)) })
+   val infoCard=detailCard("ⓘ  Info personalizzate")
    customFields.forEach { key ->
-    root.addView(android.widget.CheckBox(this).apply {
+    infoCard.addView(android.widget.CheckBox(this).apply {
      text=infoLabel(key);textSize=16f
      isChecked=customer[key].equals("true",true) || customer[key]=="1"
      setOnCheckedChangeListener { check,checked ->
@@ -1100,9 +1117,9 @@ shell.addView(bottomNav)
   val (count,last)=db.stats(code)
   val visits=db.visitEntries(code)
   val visitHistory=visits.joinToString("\n") { "• ${it.second.format(displayDate)}" }
-  root.addView(TextView(this).apply {
+  detailCard(if(isGerman())"▦  Besuchsverlauf" else "▦  Storico visite").addView(TextView(this).apply {
    text=if(isGerman()) "Besuche ${LocalDate.now().year}: $count\nLetzter Besuch: ${formatDate(last)}\n\nVerlauf:\n$visitHistory" else "Visite ${LocalDate.now().year}: $count\nUltima visita: ${formatDate(last)}\n\nStorico:\n$visitHistory"
-   textSize=17f;setPadding(0,15,0,15)
+   textSize=16f;setPadding(dp(5),dp(10),dp(5),dp(10))
   })
   val completed=db.tasks(openOnly=false).filter { it.code==code && it.done && it.notes.isNotBlank() }
   if(completed.isNotEmpty())root.addView(TextView(this).apply {

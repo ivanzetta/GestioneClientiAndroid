@@ -1177,11 +1177,21 @@ shell.addView(bottomNav)
    clientReminders.forEach { reminder ->
     val dateLabel=reminder.date?.let { formatDate(it) } ?: "Senza data"
     val noteLabel=reminder.notes.ifBlank { "Nessuna nota" }
-    root.addView(secondaryButton("Promemoria · "+dateLabel+"\n"+noteLabel) { editTask(code,"contatto") }.apply {
+    val reminderLine=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
+    reminderLine.addView(secondaryButton("Promemoria · "+dateLabel+"\n"+noteLabel) { editTask(code,"contatto") }.apply {
      gravity=android.view.Gravity.CENTER_VERTICAL or android.view.Gravity.START
      textSize=14f
      setPadding(dp(14),dp(10),dp(14),dp(10))
-    },LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(8)})
+    },LinearLayout.LayoutParams(0,-2,1f).apply {marginEnd=dp(6)})
+    reminderLine.addView(secondaryButton("×") {
+     AlertDialog.Builder(this).setTitle("Eliminare promemoria?")
+      .setMessage("Vuoi eliminare questo promemoria del cliente? L'operazione non può essere annullata.")
+      .setNegativeButton("Annulla",null)
+      .setPositiveButton("Elimina"){_,_->db.removeTask(reminder.id);detail(code)}
+      .show()
+    }.apply {contentDescription="Elimina promemoria";textSize=20f;setTextColor(Color.rgb(180,40,30));minHeight=dp(48);minimumHeight=dp(48)},
+     LinearLayout.LayoutParams(dp(52),dp(52)))
+    root.addView(reminderLine,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(8)})
    }
   }
 

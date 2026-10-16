@@ -232,7 +232,7 @@ class MainActivity: Activity() {
   root.addView(homeText("Riepilogo attività",18f,true))
   val now=LocalDate.now()
   val tasks=db.tasks().filter { it.type=="visita" || it.type=="contatto" || it.type=="giro" }
-  val rows=listOf(listOf("▣","Visite oggi","visita","today"),listOf("▣","Visite future","visita","future"),listOf("☎","Contatti oggi","contatto","today"),listOf("☎","Contatti futuri","contatto","future"))
+  val rows=listOf(listOf("▣","Visite oggi","visita","today"),listOf("▣","Visite future","visita","future"),listOf("🔔","Promemoria oggi","contatto","today"),listOf("🔔","Promemoria futuri","contatto","future"))
   rows.chunked(2).forEach { pair ->
    val tiles=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
    pair.forEachIndexed { i,info ->
@@ -241,13 +241,14 @@ class MainActivity: Activity() {
     val overdue=matching.count { it.date!!<now.toString() }
     val card=homeCard(if(type=="visita")Color.rgb(255,246,218) else Color.rgb(225,241,255)).apply {
      gravity=android.view.Gravity.CENTER
-     addView(homeText(info[0],25f,true).apply{gravity=android.view.Gravity.CENTER})
-     addView(homeText("${matching.size}",29f,true).apply{gravity=android.view.Gravity.CENTER})
-     addView(homeText(info[1],15f,true).apply{gravity=android.view.Gravity.CENTER})
+     setPadding(dp(8),dp(5),dp(8),dp(5))
+     addView(homeText(info[0],21f,true).apply{gravity=android.view.Gravity.CENTER})
+     addView(homeText("${matching.size}",27f,true).apply{gravity=android.view.Gravity.CENTER})
+     addView(homeText(info[1],14f,true).apply{gravity=android.view.Gravity.CENTER})
      if(overdue>0)addView(homeText("⚠ $overdue scadute",12f,true,Color.rgb(180,40,30)).apply{gravity=android.view.Gravity.CENTER})
      setOnClickListener { showTasks(type,period) }
     }
-    tiles.addView(card,LinearLayout.LayoutParams(0,dp(148),1f).apply { marginStart=if(i==0)0 else dp(5);marginEnd=if(i==0)dp(5) else 0 })
+    tiles.addView(card,LinearLayout.LayoutParams(0,dp(108),1f).apply { marginStart=if(i==0)0 else dp(5);marginEnd=if(i==0)dp(5) else 0 })
    }
    root.addView(tiles,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(9);bottomMargin=dp(5)})
   }

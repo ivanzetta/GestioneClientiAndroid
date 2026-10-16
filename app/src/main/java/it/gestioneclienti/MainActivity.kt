@@ -646,17 +646,49 @@ shell.addView(bottomNav)
  private fun showOptions() {
   screen(tr("Opzioni"))
   root.addView(secondaryButton("← " + tr("Indietro")){showHome()}.apply {minHeight=dp(42);minimumHeight=dp(42)})
-  fun optionsHeading(icon:String,title:String) {
-   root.addView(homeCard(paleYellow).apply {
-    addView(homeText("$icon  $title",17f,true))
-   })
+  var optionContainer=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL}
+  var optionRow:LinearLayout?=null
+  fun optionsHeading(icon:Int,title:String,paired:Boolean=false) {
+   val card=LinearLayout(this).apply {
+    orientation=LinearLayout.VERTICAL
+    background=shape(Color.WHITE,softBorder)
+    setPadding(dp(10),dp(10),dp(10),dp(10))
+   }
+   val headingRow=LinearLayout(this).apply {
+    orientation=LinearLayout.HORIZONTAL
+    gravity=android.view.Gravity.CENTER_VERTICAL
+    background=shape(paleYellow)
+    setPadding(dp(10),dp(9),dp(10),dp(9))
+   }
+   headingRow.addView(android.widget.ImageView(this).apply {
+    setImageResource(icon);setColorFilter(ink)
+   },LinearLayout.LayoutParams(dp(22),dp(22)).apply {marginEnd=dp(10)})
+   headingRow.addView(homeText(title,17f,true))
+   card.addView(headingRow)
+   optionContainer=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL}
+   card.addView(optionContainer)
+   optionRow=if(paired) LinearLayout(this).apply {
+    orientation=LinearLayout.HORIZONTAL
+    optionContainer.addView(this)
+   } else null
+   root.addView(card,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=dp(12)})
+  }
+  fun addOption(view:android.view.View) {
+   if(view is android.widget.TextView) {
+    view.textSize=if(optionRow!=null) 12f else 15f
+    view.minHeight=dp(52);view.minimumHeight=dp(52)
+    view.setPadding(dp(5),dp(7),dp(5),dp(7))
+   }
+   val row=optionRow
+   if(row!=null) row.addView(view,LinearLayout.LayoutParams(0,dp(64),1f).apply {marginEnd=dp(5);topMargin=dp(7)})
+   else optionContainer.addView(view,LinearLayout.LayoutParams(-1,dp(56)).apply {topMargin=dp(7)})
   }
 
-  optionsHeading("▣",tr("Importazione ed esportazione Excel"))
-  root.addView(secondaryButton("↑  "+tr("Importa Excel .xlsx")) {
+  optionsHeading(android.R.drawable.ic_menu_save,tr("Importazione ed esportazione Excel"),true)
+  addOption(secondaryButton("↑  "+tr("Importa Excel .xlsx")) {
    startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply { type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";addCategory(Intent.CATEGORY_OPENABLE) },importRequest)
   })
-  root.addView(secondaryButton("↓  "+tr("Esporta Excel .xlsx")) {
+  addOption(secondaryButton("↓  "+tr("Esporta Excel .xlsx")) {
    AlertDialog.Builder(this).setTitle(tr("Attenzione ai dati personali"))
     .setMessage(tr("Il file Excel non è cifrato e contiene dati dei clienti. Conservalo in una posizione protetta e non condividerlo senza autorizzazione."))
     .setNegativeButton(tr("Annulla"), null)
@@ -664,14 +696,14 @@ shell.addView(bottomNav)
      startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply { type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";putExtra(Intent.EXTRA_TITLE,"clienti.xlsx");addCategory(Intent.CATEGORY_OPENABLE) },exportRequest)
     }.show()
   })
-  optionsHeading("▤",tr("Backup e ripristino"))
-  root.addView(secondaryButton("⊕  "+tr("Crea backup cifrato")) {
+  optionsHeading(android.R.drawable.ic_lock_lock,tr("Backup e ripristino"),true)
+  addOption(secondaryButton("⊕  "+tr("Crea backup cifrato")) {
    askBackupPassword(tr("Password per il backup (minimo 12 caratteri)")) { password ->
     backupPassword=password
     startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply { type="application/octet-stream";putExtra(Intent.EXTRA_TITLE,"clienti.gcbk");addCategory(Intent.CATEGORY_OPENABLE) },backupRequest)
    }
   })
-  root.addView(secondaryButton("↻  "+tr("Ripristina backup cifrato")) {
+  addOption(secondaryButton("↻  "+tr("Ripristina backup cifrato")) {
    AlertDialog.Builder(this).setTitle(tr("Ripristino completo"))
     .setMessage(tr("Il ripristino SOSTITUIRÀ tutti i clienti e tutte le visite presenti. Assicurati di avere una copia di sicurezza."))
     .setNegativeButton(tr("Annulla"),null).setPositiveButton(tr("Continua")) { _,_ ->
@@ -682,14 +714,14 @@ shell.addView(bottomNav)
     }.show()
   })
 
-  optionsHeading("⚙","Personalizza campi Info")
-  root.addView(secondaryButton("✎  Modifica etichette Info1–Info5"){showInfoSettings()})
-  optionsHeading("▣",tr("Sicurezza"))
-  root.addView(secondaryButton("▣  "+tr("Sicurezza")){showSecurity()})
-  optionsHeading("◎",tr("Lingua"))
-  root.addView(secondaryButton("◎  "+tr("Lingua") + " / Sprache"){chooseLanguage()})
-  optionsHeading("ⓘ",tr("Informazioni sull’app"))
-  root.addView(secondaryButton("ⓘ  "+tr("Informazioni sull’app")){showAbout()})
+  optionsHeading(android.R.drawable.ic_menu_manage,"Personalizza campi Info")
+  addOption(secondaryButton("✎  Modifica etichette Info1–Info5"){showInfoSettings()})
+  optionsHeading(android.R.drawable.ic_lock_lock,tr("Sicurezza"))
+  addOption(secondaryButton("▣  "+tr("Sicurezza")){showSecurity()})
+  optionsHeading(android.R.drawable.ic_menu_compass,tr("Lingua"))
+  addOption(secondaryButton("◎  "+tr("Lingua") + " / Sprache"){chooseLanguage()})
+  optionsHeading(android.R.drawable.ic_menu_info_details,tr("Informazioni sull’app"))
+  addOption(secondaryButton("ⓘ  "+tr("Informazioni sull’app")){showAbout()})
  }
  private fun showInfoSettings() {
   screen("Personalizza campi Info")

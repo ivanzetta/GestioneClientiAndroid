@@ -72,6 +72,7 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
  }
  fun changeVisitDate(code:String,id:Long,date:LocalDate) {
   require(!date.isAfter(LocalDate.now())) { "Non puoi registrare una visita futura" }
+  require(!readableDatabase.rawQuery("SELECT 1 FROM visite WHERE codice=? AND data=? AND id<>? LIMIT 1",arrayOf(code,date.toString(),id.toString())).use { it.moveToFirst() }) { "Visita già registrata per questo giorno" }
   val values=android.content.ContentValues().apply { put("data",date.toString()) }
   require(writableDatabase.update("visite",values,"id=? AND codice=?",arrayOf(id.toString(),code))==1) { "Visita non trovata" }
  }
@@ -124,7 +125,12 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
   } finally { database.endTransaction() }
  }
  fun delete(code:String) { writableDatabase.delete("clienti","codice=?",arrayOf(code)) }
- fun visit(code:String, date:LocalDate = LocalDate.now()) { require(!date.isAfter(LocalDate.now())) { "Non puoi registrare una visita futura" }; writableDatabase.execSQL("INSERT INTO visite(codice,data) VALUES(?,?)",arrayOf(code,date.toString())) }
+ fun hasVisit(code:String,date:String):Boolean = readableDatabase.rawQuery("SELECT 1 FROM visite WHERE codice=? AND data=? LIMIT 1",arrayOf(code,date)).use { it.moveToFirst() }
+ fun visit(code:String, date:LocalDate = LocalDate.now()) {
+  require(!date.isAfter(LocalDate.now())) { "Non puoi registrare una visita futura" }
+  require(!hasVisit(code,date.toString())) { "Visita già registrata per questo cliente nella data selezionata" }
+  writableDatabase.execSQL("INSERT INTO visite(codice,data) VALUES(?,?)",arrayOf(code,date.toString()))
+ }
  fun undoLastVisit(code:String) { writableDatabase.execSQL("DELETE FROM visite WHERE id=(SELECT id FROM visite WHERE codice=? ORDER BY id DESC LIMIT 1)",arrayOf(code)) }
  fun stats(code:String):Pair<Int,String> {
   val year=LocalDate.now().year.toString()
@@ -172,6 +178,7 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
  }
  fun saveTask(code:String,type:String,date:String?,notes:String):Boolean {
   require(type=="visita" || type=="contatto")
+  if(type=="visita" && date!=null) require(!hasVisit(code,date)) { "Visita già registrata per questo giorno" }
   val cv=android.content.ContentValues().apply {put("codice",code);put("tipo",type);put("data",date);put("note",notes);put("completata",0)}
   val existing=readableDatabase.rawQuery("SELECT id FROM attivita WHERE codice=? AND tipo=? AND completata=0",arrayOf(code,type)).use { if(it.moveToFirst()) it.getLong(0) else null }
   if(existing!=null) writableDatabase.update("attivita",cv,"id=?",arrayOf(existing.toString())) else writableDatabase.insertOrThrow("attivita",null,cv)
@@ -180,6 +187,7 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
  fun addDayClient(code:String,date:String,notes:String="") {
   val already=readableDatabase.rawQuery("SELECT 1 FROM attivita WHERE codice=? AND tipo='giro' AND data=? AND completata=0",arrayOf(code,date)).use {it.moveToFirst()}
   require(!already){"Cliente già presente in questo giro"}
+  require(!hasVisit(code,date)){"Visita già registrata per questo cliente nella data selezionata"}
   val next=readableDatabase.rawQuery("SELECT COALESCE(MAX(posizione),0)+1 FROM attivita WHERE tipo='giro' AND data=?",arrayOf(date)).use{it.moveToFirst();it.getInt(0)}
   val cv=android.content.ContentValues().apply{put("codice",code);put("tipo","giro");put("data",date);put("note",notes);put("posizione",next)}
   writableDatabase.insertOrThrow("attivita",null,cv)
@@ -193,7 +201,7 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
      val code=c.getString(0);val type=c.getString(1)
      val values=android.content.ContentValues().apply {put("completata",1)}
      if(sql.update("attivita",values,"id=? AND completata=0",arrayOf(id.toString()))==1 && (type=="visita" || type=="giro")) {
-      sql.execSQL("INSERT INTO visite(codice,data) VALUES(?,?)",arrayOf(code,LocalDate.now().toString()))
+      if(!hasVisit(code,LocalDate.now().toString())) sql.execSQL("INSERT INTO visite(codice,data) VALUES(?,?)",arrayOf(code,LocalDate.now().toString()))
      }
     }
    }
@@ -212,7 +220,7 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
      if(type=="visita" || type=="giro") {
       val values=android.content.ContentValues().apply { put("completata",1) }
       if(sql.update("attivita",values,"id=? AND completata=0",arrayOf(id.toString()))==1) {
-       sql.execSQL("INSERT INTO visite(codice,data) VALUES(?,?)",arrayOf(code,LocalDate.now().toString()))
+       if(!hasVisit(code,LocalDate.now().toString())) sql.execSQL("INSERT INTO visite(codice,data) VALUES(?,?)",arrayOf(code,LocalDate.now().toString()))
        if(type=="visita") {
         sql.delete("attivita","codice=? AND tipo='giro' AND data=? AND completata=0",arrayOf(code,day))
        } else {
@@ -244,6 +252,12 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
  fun changeTaskNote(id:Long,note:String){val cv=android.content.ContentValues().apply{put("note",note)};writableDatabase.update("attivita",cv,"id=?",arrayOf(id.toString()))}
  fun swapDayTasks(a:Task,b:Task){val db=writableDatabase;db.beginTransaction();try{db.execSQL("UPDATE attivita SET posizione=? WHERE id=?",arrayOf(b.position,a.id));db.execSQL("UPDATE attivita SET posizione=? WHERE id=?",arrayOf(a.position,b.id));db.setTransactionSuccessful()}finally{db.endTransaction()}}
 
+ fun reorderDayClients(day:String,codes:List<String>) {
+  val sql=writableDatabase;sql.beginTransaction()
+  try { codes.forEachIndexed { index,code ->
+   sql.execSQL("UPDATE attivita SET posizione=? WHERE codice=? AND data<=? AND tipo IN ('visita','giro') AND completata=0",arrayOf(index+1,code,day))
+  };sql.setTransactionSuccessful() } finally {sql.endTransaction()}
+ }
  fun history(code:String):String {
   val years= mutableListOf<String>()
   readableDatabase.rawQuery("SELECT substr(data,1,4),COUNT(*) FROM visite WHERE codice=? GROUP BY substr(data,1,4) ORDER BY 1 DESC",arrayOf(code)).use{c->while(c.moveToNext())years.add("${c.getString(0)}: ${c.getInt(1)} visite")}

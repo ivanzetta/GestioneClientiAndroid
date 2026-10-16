@@ -267,7 +267,13 @@ class MainActivity: Activity() {
   root.addView(day,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(18)})
   root.addView(homeText("Clienti",22f,true))
   val clients=homeCard(Color.WHITE).apply {background=shape(Color.WHITE,Color.rgb(225,225,225))}
-  clients.addView(homeText("♟   Elenco clienti                 ›",18f,true))
+  val clientsTitle=LinearLayout(this).apply {orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL}
+  clientsTitle.addView(android.widget.ImageView(this).apply {
+   setImageResource(R.drawable.ic_nav_clients);contentDescription="Clienti"
+  },LinearLayout.LayoutParams(dp(24),dp(24)).apply {marginEnd=dp(12)})
+  clientsTitle.addView(homeText("Elenco clienti",18f,true),LinearLayout.LayoutParams(0,-2,1f))
+  clientsTitle.addView(homeText("›",22f,true))
+  clients.addView(clientsTitle)
   clients.addView(homeText("      Cerca, aggiungi e gestisci i tuoi clienti",13f,false,Color.DKGRAY))
   clients.setOnClickListener{showList("")}
   root.addView(clients,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(12)})

@@ -337,7 +337,6 @@ shell.addView(bottomNav)
   }
   val infoContainer=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
   val toggleFilters:()->Unit={listFiltersVisible=!listFiltersVisible;infoContainer.visibility=if(listFiltersVisible) android.view.View.VISIBLE else android.view.View.GONE}
-  filterRow(Pair("Filtri",toggleFilters),Pair("Ordina",{sortAction()}),Pair("Zona",{zoneAction.performClick()}))
   filterButtons.removeAllViews()
   val firstRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
   fun addSquare(row:LinearLayout,label:String,action:()->Unit) {

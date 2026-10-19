@@ -1310,7 +1310,7 @@ shell.addView(bottomNav)
    "options" -> showHome()
    "list" -> showHome()
    "detail" -> showList()
-    "tasks", "day" -> showHome()
+    "tasks", "day", "newsletter" -> showHome()
    "suboptions" -> showOptions()
    "edit" -> {
     val changed=editingFields.any { (key,field) -> (if(key=="provincia" || key=="settore")field.text.toString().substringBefore(" – ").trim() else field.text.toString()) != (originalValues[key] ?: "") }

@@ -1206,13 +1206,48 @@ shell.addView(bottomNav)
   })
   root.addView(actionRow)
   actionRow.addView(iconButton("↗","Condividi cliente") {
-   val parts=mutableListOf(customer["nome"].orEmpty(), destination)
-   listOf("contatto_principale","telefono_principale","email_principale","contatto_secondario","telefono_secondario","email_secondaria").forEach { key ->
-    customer[key]?.takeIf { it.isNotBlank() }?.let { parts.add(tr(captions[fields.indexOf(key)])+": "+it) }
-   }
-   if(destination.isNotBlank()) parts.add("Google Maps: https://www.google.com/maps/search/?api=1&query="+Uri.encode(destination))
-   val share=Intent(Intent.ACTION_SEND).apply { type="text/plain";putExtra(Intent.EXTRA_TEXT,parts.filter{it.isNotBlank()}.joinToString("\n")) }
-   startActivity(Intent.createChooser(share,tr("Condividi cliente")))
+   AlertDialog.Builder(this).setTitle("Condividi cliente")
+    .setItems(arrayOf("Testo","vCard (.vcf)")) { _,choice ->
+     if(choice==0) {
+      val parts=mutableListOf(customer["nome"].orEmpty(),destination)
+      listOf("contatto_principale","telefono_principale","email_principale","contatto_secondario","telefono_secondario","email_secondaria").forEach { key ->
+       customer[key]?.takeIf { it.isNotBlank() }?.let { parts.add(tr(captions[fields.indexOf(key)])+": "+it) }
+      }
+      if(destination.isNotBlank()) parts.add("Google Maps: https://www.google.com/maps/search/?api=1&query="+Uri.encode(destination))
+      val share=Intent(Intent.ACTION_SEND).apply {type="text/plain";putExtra(Intent.EXTRA_TEXT,parts.filter{it.isNotBlank()}.joinToString("\\n"))}
+      startActivity(Intent.createChooser(share,tr("Condividi cliente")))
+     } else {
+      try {
+       fun esc(value:String):String=value.replace("\\","\\\\").replace("\n","\\n").replace("\r","").replace(",","\\,").replace(";","\\;")
+       val lines=mutableListOf("BEGIN:VCARD","VERSION:3.0","FN:"+esc(customer["nome"].orEmpty()))
+       listOf("telefono_principale","telefono_secondario").forEachIndexed { index,key ->
+        customer[key]?.trim()?.takeIf { it.isNotBlank() }?.let {lines.add("TEL;TYPE="+(if(index==0)"WORK" else "CELL")+":"+esc(it))}
+       }
+       listOf("email_principale","email_secondaria").forEach { key ->
+        customer[key]?.trim()?.takeIf { it.isNotBlank() }?.let {lines.add("EMAIL;TYPE=INTERNET:"+esc(it))}
+       }
+       val street=customer["indirizzo"].orEmpty()
+       val city=customer["citta"].orEmpty()
+       val province=customer["provincia"].orEmpty()
+       val cap=customer["cap"].orEmpty()
+       if(listOf(street,city,province,cap).any { it.isNotBlank() }) lines.add("ADR;TYPE=WORK:;;"+esc(street)+";"+esc(city)+";"+esc(province)+";"+esc(cap)+";Italia")
+       lines.add("END:VCARD")
+       val dir=java.io.File(cacheDir,"shared_contacts").apply {mkdirs()}
+       val file=java.io.File(dir,"cliente_"+customer["codice"].orEmpty().replace(Regex("[^a-zA-Z0-9_-]"),"_")+".vcf")
+       file.writeText(lines.joinToString("\r\n")+"\r\n",Charsets.UTF_8)
+       val uri=androidx.core.content.FileProvider.getUriForFile(this,packageName+".fileprovider",file)
+       val share=Intent(Intent.ACTION_SEND).apply {
+        type="text/x-vcard"
+        putExtra(Intent.EXTRA_STREAM,uri)
+        clipData=android.content.ClipData.newUri(contentResolver,"Contatto vCard",uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+       }
+       startActivity(Intent.createChooser(share,"Condividi vCard"))
+      } catch(e:Exception) {
+       Toast.makeText(this,"Impossibile condividere vCard: "+(e.message ?: "errore"),Toast.LENGTH_LONG).show()
+      }
+     }
+    }.setNegativeButton("Annulla",null).show()
   })
   actionRow.addView(iconButton("▦","Appuntamento") {
    val subject="Appuntamento – "+customer["nome"].orEmpty()

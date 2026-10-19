@@ -238,7 +238,7 @@ class MainActivity: Activity() {
    pair.forEachIndexed { i,info ->
     val type=info[2];val period=info[3]
     val matching=tasks.filter { (it.type==type || (type=="visita" && it.type=="giro")) && (if(period=="today") (it.date!=null && it.date<=now.toString()) || (type=="contatto" && it.date==null) else it.date!=null && it.date>now.toString()) }.distinctBy { it.code to it.date }
-    val overdue=matching.count { it.date!!<now.toString() }
+    val overdue=matching.count { it.date!=null && it.date<now.toString() }
     val card=homeCard(if(type=="visita")Color.rgb(255,246,218) else Color.rgb(225,241,255)).apply {
      gravity=android.view.Gravity.CENTER
      setPadding(dp(8),dp(5),dp(8),dp(5))
@@ -277,9 +277,90 @@ class MainActivity: Activity() {
   clients.addView(homeText("      Cerca, aggiungi e gestisci i tuoi clienti",13f,false,Color.DKGRAY))
   clients.setOnClickListener{showList("")}
   root.addView(clients,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(12)})
+  val newsletterTile=homeCard(Color.WHITE).apply {background=shape(Color.WHITE,Color.rgb(225,225,225))}
+  newsletterTile.addView(homeText("✉  Newsletter     ›",18f,true))
+  newsletterTile.addView(homeText("      Prepara un messaggio per i contatti abilitati",13f,false,Color.DKGRAY))
+  newsletterTile.setOnClickListener {showNewsletter()}
+  root.addView(newsletterTile,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(10)})
+ }
+ private fun showNewsletter() {
+  screen("Newsletter")
+  root.addView(secondaryButton("← Home"){showHome()})
+  heading("Newsletter")
+  val customers=db.allCustomers()
+  val zones=customers.map { it["zona"].orEmpty().trim() }.distinct().sortedWith(String.CASE_INSENSITIVE_ORDER)
+  val sectors=customers.map { it["settore"].orEmpty().trim() }.distinct().sortedWith(String.CASE_INSENSITIVE_ORDER)
+  val selectedZones=mutableSetOf<String>()
+  val selectedSectors=mutableSetOf<String>()
+  val zoneButton=secondaryButton("Zone: tutte") {}
+  val sectorButton=secondaryButton("Settori: tutti") {}
+  val countLabel=homeText("",16f,true)
+  val subject=EditText(this).apply {hint="Oggetto";setSingleLine(true);inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES}
+  val message=EditText(this).apply {
+   hint="Testo newsletter"
+   inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+   setSingleLine(false);minLines=6;maxLines=12
+   gravity=android.view.Gravity.TOP or android.view.Gravity.START
+  }
+  fun recipients():List<String> {
+   val emails=mutableListOf<String>()
+   customers.filter { customer ->
+    (selectedZones.isEmpty() || customer["zona"].orEmpty().trim() in selectedZones) &&
+    (selectedSectors.isEmpty() || customer["settore"].orEmpty().trim() in selectedSectors)
+   }.forEach { customer ->
+    if(customer["newsletter1"].equals("true",true) || customer["newsletter1"]=="1") emails.add(customer["email_principale"].orEmpty().trim())
+    if(customer["newsletter2"].equals("true",true) || customer["newsletter2"]=="1") emails.add(customer["email_secondaria"].orEmpty().trim())
+   }
+   return emails.filter { android.util.Patterns.EMAIL_ADDRESS.matcher(it).matches() }.distinctBy { it.lowercase(Locale.ROOT) }
+  }
+  fun refreshCount() {
+   zoneButton.text="Zone: "+(if(selectedZones.isEmpty())"tutte" else "${selectedZones.size} selezionate")
+   sectorButton.text="Settori: "+(if(selectedSectors.isEmpty())"tutti" else "${selectedSectors.size} selezionati")
+   countLabel.text="Destinatari abilitati: ${recipients().size}"
+  }
+  fun selectMultiple(title:String,choices:List<String>,selected:MutableSet<String>,onDone:()->Unit) {
+   val labels=choices.map { if(it.isBlank()) "Senza ${title.lowercase(Locale.ROOT)}" else it }.toTypedArray()
+   val checked=BooleanArray(choices.size) { choices[it] in selected }
+   AlertDialog.Builder(this).setTitle(title+" (nessuna selezione = tutti)")
+    .setMultiChoiceItems(labels,checked){_,which,isChecked->checked[which]=isChecked}
+    .setNegativeButton("Annulla",null)
+    .setNeutralButton("Tutti"){_,_->selected.clear();onDone()}
+    .setPositiveButton("Applica"){_,_->
+     selected.clear();choices.forEachIndexed { index,value ->if(checked[index])selected.add(value) }
+     onDone()
+    }.show()
+  }
+  zoneButton.setOnClickListener {selectMultiple("Zone",zones,selectedZones){refreshCount()}}
+  sectorButton.setOnClickListener {selectMultiple("Settori",sectors,selectedSectors){refreshCount()}}
+  root.addView(zoneButton,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(12)})
+  root.addView(sectorButton,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(8)})
+  root.addView(countLabel,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(12);bottomMargin=dp(8)})
+  root.addView(homeText("Oggetto",15f,true))
+  root.addView(subject,LinearLayout.LayoutParams(-1,dp(54)))
+  root.addView(homeText("Messaggio",15f,true).apply {setPadding(0,dp(10),0,0)})
+  root.addView(message,LinearLayout.LayoutParams(-1,dp(180)))
+  root.addView(primaryButton("Apri in Gmail o Outlook") {
+   val addresses=recipients()
+   val title=subject.text.toString().trim()
+   val body=message.text.toString()
+   when {
+    addresses.isEmpty()->Toast.makeText(this,"Nessun indirizzo email abilitato nei filtri selezionati",Toast.LENGTH_LONG).show()
+    title.isBlank() || body.isBlank()->Toast.makeText(this,"Inserisci oggetto e messaggio",Toast.LENGTH_LONG).show()
+    else -> {
+     val intent=Intent(Intent.ACTION_SENDTO,Uri.parse("mailto:")).apply {
+      putExtra(Intent.EXTRA_BCC,addresses.toTypedArray())
+      putExtra(Intent.EXTRA_SUBJECT,title)
+      putExtra(Intent.EXTRA_TEXT,body)
+     }
+     if(intent.resolveActivity(packageManager)!=null)startActivity(Intent.createChooser(intent,"Invia newsletter con"))
+     else Toast.makeText(this,"Installa o configura Gmail o Outlook per inviare la newsletter",Toast.LENGTH_LONG).show()
+    }
+   }
+  }.apply {minHeight=dp(54)},LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(14)})
+  refreshCount()
  }
  private fun screen(title:String):LinearLayout {
-  currentPage=when(title) { "YellowKunde" -> "list"; "Home" -> "home"; "Pianifica giornata" -> "day"; "Attività" -> "tasks"; tr("Opzioni") -> "options"; tr("Sicurezza"),tr("Informazioni sull’app") -> "suboptions"; tr("Nuovo cliente"),tr("Modifica cliente") -> "edit"; else -> "detail" }
+  currentPage=when(title) { "YellowKunde" -> "list"; "Home" -> "home"; "Pianifica giornata" -> "day"; "Newsletter" -> "newsletter"; "Attività" -> "tasks"; tr("Opzioni") -> "options"; tr("Sicurezza"),tr("Informazioni sull’app") -> "suboptions"; tr("Nuovo cliente"),tr("Modifica cliente") -> "edit"; else -> "detail" }
   root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(16),dp(14),dp(24));setBackgroundColor(warmBackground)}
   val scroll=ScrollView(this)
   // Respect the real system-bar insets on Pixel and Samsung, including display cutouts.
@@ -1019,7 +1100,7 @@ shell.addView(bottomNav)
    }
   }
   fields.forEachIndexed{index,key->
-   if(key in infoKeys) return@forEachIndexed
+   if(key in infoKeys || key=="newsletter1" || key=="newsletter2") return@forEachIndexed
    root.addView(homeText(tr(captions[index]),14f,true).apply {setPadding(0,dp(8),0,dp(3))})
    val field:EditText=if(key=="provincia") choiceField(key,provinceChoices) else if(key=="settore") choiceField(key,if(isGerman())sectorChoicesGerman else sectorChoicesItalian) else if(key=="zona") AutoCompleteTextView(this).apply { val choices=(db.zones()+listOf(existing[key].orEmpty())).filter { it.isNotBlank() }.distinct().sortedWith(String.CASE_INSENSITIVE_ORDER);setAdapter(ArrayAdapter(this@MainActivity,android.R.layout.simple_dropdown_item_1line,choices));threshold=0;setOnClickListener { showDropDown() };setOnFocusChangeListener { _,focused -> if(focused)showDropDown() } } else EditText(this)
    field.apply{if(key!="provincia" && key!="settore")setText(existing[key] ?: "");setSingleLine(key!="note");if(key=="note")minLines=3; if(key.startsWith("telefono"))inputType=InputType.TYPE_CLASS_PHONE; if(key.startsWith("email"))inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS; textSize=15f;background=shape(Color.WHITE,softBorder);setPadding(dp(12),dp(8),dp(12),dp(8))}
@@ -1027,7 +1108,7 @@ shell.addView(bottomNav)
   }
   editingFields=inputs
   root.addView(primaryButton(tr("Salva")){
-   try {db.save(code,inputs.mapValues{(key,field)->if(key=="provincia" || key=="settore")field.text.toString().substringBefore(" – ").trim() else field.text.toString()} + infoKeys.associateWith { existing[it] ?: "false" });detail(inputs.getValue("codice").text.toString().trim())}
+   try {db.save(code,inputs.mapValues{(key,field)->if(key=="provincia" || key=="settore")field.text.toString().substringBefore(" – ").trim() else field.text.toString()} + (infoKeys+listOf("newsletter1","newsletter2")).associateWith { existing[it] ?: "false" });detail(inputs.getValue("codice").text.toString().trim())}
    catch(e:Exception){Toast.makeText(this,e.message ?: tr("Errore"),Toast.LENGTH_LONG).show()}
   })
   root.addView(button(tr("Annulla")){if(code==null)showList() else detail(code)})
@@ -1089,6 +1170,18 @@ shell.addView(bottomNav)
   section("⌖  Indirizzo e zona",listOf("indirizzo","cap","citta","provincia","zona"))
   section("☎  Contatti",listOf("contatto_principale","telefono_principale","email_principale","contatto_secondario","telefono_secondario","email_secondaria"))
   section("✎  Note",listOf("note"))
+  val newsletterCard=detailCard("✉  Newsletter")
+  listOf("newsletter1" to "Newsletter 1 · Email principale","newsletter2" to "Newsletter 2 · Email secondaria").forEach { (key,label) ->
+   newsletterCard.addView(CheckBox(this).apply {
+    text=label;textSize=16f
+    isChecked=customer[key].equals("true",true) || customer[key]=="1"
+    setOnCheckedChangeListener { check,checked ->
+     check.isEnabled=false
+     try {db.setNewsletter(code,key,checked);check.isEnabled=true}
+     catch(e:Exception){Toast.makeText(this@MainActivity,e.message ?: "Errore",Toast.LENGTH_LONG).show();detail(code)}
+    }
+   })
+  }
   val customFields=infoKeys.filter { customInfo(it)!=null && customer[it].orEmpty().isNotBlank() }
   if(customFields.isNotEmpty()) {
    val infoCard=detailCard("ⓘ  Info personalizzate")

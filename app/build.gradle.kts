@@ -12,4 +12,4 @@ kotlinOptions {
 }
 }
 
- dependencies { implementation("org.apache.poi:poi-ooxml:5.2.5") }
+ dependencies { implementation("org.apache.poi:poi-ooxml:5.2.5"); implementation("androidx.core:core:1.15.0") }

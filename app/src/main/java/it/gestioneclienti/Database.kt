@@ -5,11 +5,11 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import java.time.LocalDate
 
-val fields = listOf("codice", "nome", "indirizzo", "cap", "citta", "provincia", "zona", "settore", "contatto_principale", "telefono_principale", "email_principale", "contatto_secondario", "telefono_secondario", "email_secondaria", "info1", "info2", "info3", "info4", "info5", "note")
-val captions = listOf("Codice cliente", "Nome", "Indirizzo", "CAP", "Città", "Provincia", "Zona", "Settore", "Contatto principale", "Telefono principale", "Email principale", "Contatto secondario", "Telefono secondario", "Email secondaria", "Info1", "Info2", "Info3", "Info4", "Info5", "Note")
-class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 4) {
+val fields = listOf("codice", "nome", "indirizzo", "cap", "citta", "provincia", "zona", "settore", "contatto_principale", "telefono_principale", "email_principale", "contatto_secondario", "telefono_secondario", "email_secondaria", "newsletter1", "newsletter2", "info1", "info2", "info3", "info4", "info5", "note")
+val captions = listOf("Codice cliente", "Nome", "Indirizzo", "CAP", "Città", "Provincia", "Zona", "Settore", "Contatto principale", "Telefono principale", "Email principale", "Contatto secondario", "Telefono secondario", "Email secondaria", "Newsletter 1", "Newsletter 2", "Info1", "Info2", "Info3", "Info4", "Info5", "Note")
+class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 5) {
  override fun onCreate(db: SQLiteDatabase) {
-  db.execSQL("CREATE TABLE clienti (codice TEXT PRIMARY KEY, nome TEXT NOT NULL DEFAULT '', indirizzo TEXT NOT NULL DEFAULT '', cap TEXT NOT NULL DEFAULT '', citta TEXT NOT NULL DEFAULT '', provincia TEXT NOT NULL DEFAULT '', zona TEXT NOT NULL DEFAULT '', settore TEXT NOT NULL DEFAULT '', contatto_principale TEXT NOT NULL DEFAULT '', telefono_principale TEXT NOT NULL DEFAULT '', email_principale TEXT NOT NULL DEFAULT '', contatto_secondario TEXT NOT NULL DEFAULT '', telefono_secondario TEXT NOT NULL DEFAULT '', email_secondaria TEXT NOT NULL DEFAULT '', info1 TEXT NOT NULL DEFAULT 'false', info2 TEXT NOT NULL DEFAULT 'false', info3 TEXT NOT NULL DEFAULT 'false', info4 TEXT NOT NULL DEFAULT 'false', info5 TEXT NOT NULL DEFAULT 'false', note TEXT NOT NULL DEFAULT '')")
+  db.execSQL("CREATE TABLE clienti (codice TEXT PRIMARY KEY, nome TEXT NOT NULL DEFAULT '', indirizzo TEXT NOT NULL DEFAULT '', cap TEXT NOT NULL DEFAULT '', citta TEXT NOT NULL DEFAULT '', provincia TEXT NOT NULL DEFAULT '', zona TEXT NOT NULL DEFAULT '', settore TEXT NOT NULL DEFAULT '', contatto_principale TEXT NOT NULL DEFAULT '', telefono_principale TEXT NOT NULL DEFAULT '', email_principale TEXT NOT NULL DEFAULT '', contatto_secondario TEXT NOT NULL DEFAULT '', telefono_secondario TEXT NOT NULL DEFAULT '', email_secondaria TEXT NOT NULL DEFAULT '', newsletter1 TEXT NOT NULL DEFAULT 'false', newsletter2 TEXT NOT NULL DEFAULT 'false', info1 TEXT NOT NULL DEFAULT 'false', info2 TEXT NOT NULL DEFAULT 'false', info3 TEXT NOT NULL DEFAULT 'false', info4 TEXT NOT NULL DEFAULT 'false', info5 TEXT NOT NULL DEFAULT 'false', note TEXT NOT NULL DEFAULT '')")
   db.execSQL("CREATE TABLE visite (id INTEGER PRIMARY KEY AUTOINCREMENT, codice TEXT NOT NULL REFERENCES clienti(codice) ON DELETE CASCADE, data TEXT NOT NULL)")
   db.execSQL("CREATE INDEX idx_visite_cliente ON visite(codice, data)")
   createPlans(db)
@@ -30,6 +30,15 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
    for(i in 1..5) db.execSQL("ALTER TABLE clienti ADD COLUMN info$i TEXT NOT NULL DEFAULT 'false'")
   }
   if(oldVersion < 4) createPlans(db)
+  if(oldVersion < 5) {
+   db.execSQL("ALTER TABLE clienti ADD COLUMN newsletter1 TEXT NOT NULL DEFAULT 'false'")
+   db.execSQL("ALTER TABLE clienti ADD COLUMN newsletter2 TEXT NOT NULL DEFAULT 'false'")
+  }
+ }
+ fun setNewsletter(code:String,key:String,checked:Boolean) {
+  require(key=="newsletter1" || key=="newsletter2") { "Campo newsletter non valido" }
+  val values=android.content.ContentValues().apply { put(key,if(checked) "true" else "false") }
+  require(writableDatabase.update("clienti",values,"codice=?",arrayOf(code))==1) { "Cliente non trovato" }
  }
  fun setCustomerInfo(code:String,key:String,checked:Boolean) {
   require(key in (1..5).map { "info$it" }) { "Campo Info non valido" }
@@ -87,7 +96,7 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
   val db=writableDatabase
   db.beginTransaction()
   try {
-   val cv=android.content.ContentValues(); fields.forEach{cv.put(it, values[it] ?: if(it.matches(Regex("info[1-5]"))) "false" else "")}
+   val cv=android.content.ContentValues(); fields.forEach{cv.put(it, values[it] ?: if(it.matches(Regex("info[1-5]|newsletter[12]"))) "false" else "")}
    if (oldCode != null && oldCode != code) {
     // Create the new customer before moving visits to satisfy the foreign key.
     require(db.rawQuery("SELECT 1 FROM clienti WHERE codice=?", arrayOf(oldCode)).use { it.moveToFirst() }) { "Cliente non trovato" }
@@ -155,7 +164,7 @@ class Database(context: Context): SQLiteOpenHelper(context, "clienti.db", null, 
   try {
    sql.delete("visite",null,null);sql.delete("clienti",null,null)
    customers.forEach { values ->
-    val cv=android.content.ContentValues();fields.forEach { cv.put(it,values[it] ?: if(it.matches(Regex("info[1-5]"))) "false" else "") }
+    val cv=android.content.ContentValues();fields.forEach { cv.put(it,values[it] ?: if(it.matches(Regex("info[1-5]|newsletter[12]"))) "false" else "") }
     sql.insertOrThrow("clienti",null,cv)
    }
    visits.forEach { (code,date) -> sql.execSQL("INSERT INTO visite(codice,data) VALUES(?,?)",arrayOf(code,date)) }

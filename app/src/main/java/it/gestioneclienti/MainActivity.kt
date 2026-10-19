@@ -1182,10 +1182,8 @@ shell.addView(bottomNav)
     }
    })
   }
-  val customFields=infoKeys.filter { customInfo(it)!=null && customer[it].orEmpty().isNotBlank() }
-  if(customFields.isNotEmpty()) {
-   val infoCard=detailCard("ⓘ  Info personalizzate")
-   customFields.forEach { key ->
+  val infoCard=detailCard("ⓘ  Info 1–5")
+  infoKeys.forEach { key ->
     infoCard.addView(android.widget.CheckBox(this).apply {
      text=infoLabel(key);textSize=16f
      isChecked=customer[key].equals("true",true) || customer[key]=="1"
@@ -1196,7 +1194,6 @@ shell.addView(bottomNav)
      }
     })
    }
-  }
   val destination=listOf("indirizzo","cap","citta","provincia").map { customer[it].orEmpty().trim() }.filter { it.isNotBlank() }.joinToString(", ")
   val actionRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;setPadding(0,dp(8),0,dp(8)) }
   if(destination.isNotBlank()) actionRow.addView(iconButton("➤","Vai a") {

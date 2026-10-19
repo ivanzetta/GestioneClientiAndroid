@@ -352,8 +352,8 @@ class MainActivity: Activity() {
       putExtra(Intent.EXTRA_SUBJECT,title)
       putExtra(Intent.EXTRA_TEXT,body)
      }
-     if(intent.resolveActivity(packageManager)!=null)startActivity(Intent.createChooser(intent,"Invia newsletter con"))
-     else Toast.makeText(this,"Installa o configura Gmail o Outlook per inviare la newsletter",Toast.LENGTH_LONG).show()
+     try {startActivity(Intent.createChooser(intent,"Invia newsletter con"))}
+     catch(e:android.content.ActivityNotFoundException){Toast.makeText(this,"Installa o configura Gmail o Outlook per inviare la newsletter",Toast.LENGTH_LONG).show()}
     }
    }
   }.apply {minHeight=dp(54)},LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(14)})

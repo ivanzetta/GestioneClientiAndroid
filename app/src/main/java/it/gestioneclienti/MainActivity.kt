@@ -1214,7 +1214,7 @@ shell.addView(bottomNav)
        customer[key]?.takeIf { it.isNotBlank() }?.let { parts.add(tr(captions[fields.indexOf(key)])+": "+it) }
       }
       if(destination.isNotBlank()) parts.add("Google Maps: https://www.google.com/maps/search/?api=1&query="+Uri.encode(destination))
-      val share=Intent(Intent.ACTION_SEND).apply {type="text/plain";putExtra(Intent.EXTRA_TEXT,parts.filter{it.isNotBlank()}.joinToString("\\n"))}
+      val share=Intent(Intent.ACTION_SEND).apply {type="text/plain";putExtra(Intent.EXTRA_TEXT,parts.filter{it.isNotBlank()}.joinToString("\n"))}
       startActivity(Intent.createChooser(share,tr("Condividi cliente")))
      } else {
       try {

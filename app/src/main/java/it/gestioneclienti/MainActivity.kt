@@ -632,12 +632,18 @@ shell.addView(bottomNav)
     } ?: true
     if(zoneMatches && infoMatches) {
      val flags=pending[code].orEmpty().map { task ->
-      val label=if(task.type=="visita") "Visita" else "Chiamata"
-      when {task.date==null -> "$label da programmare";task.date<today -> "⚠ $label scaduta (${formatDate(task.date)})";task.date==today -> "$label oggi";else -> "$label ${formatDate(task.date)}"}
+      val visit=task.type=="visita"
+      val label=if(visit) (if(isGerman()) "Besuch" else "Visita") else tr("Promemoria")
+      when {
+       task.date==null -> "$label · "+tr("Senza data")
+       task.date<today -> "⚠ $label "+(if(isGerman()) "überfällig" else if(visit) "scaduta" else "scaduto")+" (${formatDate(task.date)})"
+       task.date==today -> "$label "+(if(isGerman()) "heute" else "oggi")
+       else -> "$label ${formatDate(task.date)}"
+      }
      }
      val text=if(flags.isEmpty()) "$name  ·  $code" else "$name  ·  $code\n"+flags.joinToString("   •   ")
      val item=secondaryButton(text){saveListPosition(scroll);detail(code)}
-     if(flags.any { it.contains("scaduta") })item.setTextColor(Color.rgb(180,40,30))
+     if(pending[code].orEmpty().any { it.date?.let { date -> date<today } == true })item.setTextColor(Color.rgb(180,40,30))
      else if(flags.isNotEmpty())item.setTextColor(Color.rgb(25,99,160))
      list.addView(item)
     }

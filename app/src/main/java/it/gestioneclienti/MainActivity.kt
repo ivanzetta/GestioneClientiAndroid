@@ -29,7 +29,115 @@ import java.security.MessageDigest
 
 class MainActivity: Activity() {
  private val prefs by lazy { getSharedPreferences("gestione_clienti_options", Context.MODE_PRIVATE) }
- private fun tr(it:String):String = if(prefs.getString("language", "it") == "de") translations[it] ?: it else it
+ private val additionalGerman = mapOf(
+  "Gestione clienti" to "Kundenverwaltung",
+  "Riepilogo attività" to "Aktivitätenübersicht",
+  "Visite oggi" to "Besuche heute",
+  "Visite future" to "Zukünftige Besuche",
+  "Promemoria oggi" to "Erinnerungen heute",
+  "Promemoria futuri" to "Zukünftige Erinnerungen",
+  "Visite" to "Besuche",
+  "Promemoria" to "Erinnerung",
+  "⌁   Pianifica giornata     ›" to "⌁   Tagesplanung     ›",
+  "      Organizza il giro clienti senza orari" to "      Kundenbesuche ohne Uhrzeiten planen",
+  "Clienti" to "Kunden",
+  "Elenco clienti" to "Kundenliste",
+  "      Cerca, aggiungi e gestisci i tuoi clienti" to "      Kunden suchen, hinzufügen und verwalten",
+  "      Prepara un messaggio per i contatti abilitati" to "      Nachricht für freigegebene Kontakte erstellen",
+  "← Home" to "← Startseite",
+  "Zone: tutte" to "Gebiete: alle",
+  "Settori: tutti" to "Branchen: alle",
+  "Oggetto" to "Betreff",
+  "Testo newsletter" to "Newsletter-Text",
+  "Zone: " to "Gebiete: ",
+  "Settori: " to "Branchen: ",
+  "Annulla" to "Abbrechen",
+  "Tutti" to "Alle",
+  "Applica" to "Anwenden",
+  "Messaggio" to "Nachricht",
+  "Apri in Gmail o Outlook" to "In Gmail oder Outlook öffnen",
+  "Rimuovi filtro" to "Filter entfernen",
+  "Filtri clienti" to "Kundenfilter",
+  "Note" to "Notizen",
+  "Data: " to "Datum: ",
+  "Rimuovi data" to "Datum entfernen",
+  "Data: da definire" to "Datum: offen",
+  "Calendario" to "Kalender",
+  "Salva" to "Speichern",
+  "Conferma completamento" to "Abschluss bestätigen",
+  "Conferma" to "Bestätigen",
+  "Attività" to "Aktivitäten",
+  "Conferma visita" to "Besuch bestätigen",
+  "Torna indietro" to "Zurück",
+  "Annullare questa visita?" to "Diesen Besuch absagen?",
+  "La visita programmata verrà eliminata definitivamente." to "Der geplante Besuch wird endgültig gelöscht.",
+  "Elimina visita" to "Besuch löschen",
+  "Pianifica giornata" to "Tagesplanung",
+  "+ Aggiungi cliente" to "+ Kunde hinzufügen",
+  "Seleziona zona" to "Gebiet auswählen",
+  "Clienti · " to "Kunden · ",
+  "Aggiungi selezionati" to "Ausgewählte hinzufügen",
+  "Aggiunti: " to "Hinzugefügt: ",
+  "Visite da effettuare · " to "Offene Besuche · ",
+  "Nessuna visita da effettuare per questa data" to "Keine offenen Besuche für dieses Datum",
+  "Indietro" to "Zurück",
+  "Annulla visita" to "Besuch absagen",
+  "La visita programmata verrà eliminata definitivamente, senza registrarla nello storico." to "Der geplante Besuch wird endgültig gelöscht und nicht im Verlauf gespeichert.",
+  "Note visita" to "Besuchsnotizen",
+  "▦+  Aggiungi giro al calendario" to "▦+  Tour zum Kalender hinzufügen",
+  "✎  Modifica etichette Info1–Info5" to "✎  Info1–Info5 umbenennen",
+  "Personalizza campi Info" to "Info-Felder anpassen",
+  "Etichetta modificata" to "Bezeichnung geändert",
+  "Mantieni valori" to "Werte beibehalten",
+  "Imposta tutti su Falso" to "Alle auf Nein setzen",
+  "Confermi l'azzeramento?" to "Zurücksetzen bestätigen?",
+  "Ripristina nomi predefiniti" to "Standardnamen wiederherstellen",
+  "Ripristinare i nomi Info1–Info5 senza modificare i valori dei clienti?" to "Info1–Info5 wiederherstellen, ohne Kundenwerte zu ändern?",
+  "Ripristina" to "Wiederherstellen",
+  "Condividi cliente" to "Kunde teilen",
+  "Testo" to "Text",
+  "Condividi vCard" to "vCard teilen",
+  "Promemoria cliente" to "Kundenerinnerung",
+  "Pianifica visita" to "Besuch planen",
+  "Nessun promemoria attivo" to "Keine aktive Erinnerung",
+  "Promemoria · " to "Erinnerung · ",
+  "Eliminare promemoria?" to "Erinnerung löschen?",
+  "Vuoi eliminare questo promemoria del cliente? L'operazione non può essere annullata." to "Diese Kundenerinnerung löschen? Dies kann nicht rückgängig gemacht werden.",
+  "Elimina" to "Löschen",
+  "Newsletter 1 · Email principale" to "Newsletter 1 · Haupt-E-Mail",
+  "Newsletter 2 · Email secondaria" to "Newsletter 2 · Zweite E-Mail",
+  "▣  Dati cliente" to "▣  Kundendaten",
+  "⌖  Indirizzo e zona" to "⌖  Adresse und Gebiet",
+  "☎  Contatti" to "☎  Kontakte",
+  "✎  Note" to "✎  Notizen",
+  "Senza data" to "Ohne Datum",
+  "Nessuna nota" to "Keine Notiz",
+  "Zone" to "Gebiete",
+  "Settori" to "Branchen",
+  "tutte" to "alle",
+  "tutti" to "alle",
+  "Nessun indirizzo email abilitato nei filtri selezionati" to "Keine freigegebene E-Mail-Adresse für die ausgewählten Filter",
+  "Inserisci oggetto e messaggio" to "Betreff und Nachricht eingeben",
+  "Invia newsletter con" to "Newsletter senden mit",
+  "Installa o configura Gmail o Outlook per inviare la newsletter" to "Gmail oder Outlook installieren oder einrichten",
+  "Codice di attivazione" to "Aktivierungscode",
+  "Attiva YellowKunde" to "YellowKunde aktivieren",
+  "Inserisci il codice condiviso per attivare l’app offline." to "Aktivierungscode eingeben, um die App offline zu aktivieren.",
+  "Attiva" to "Aktivieren",
+  "Esci" to "Beenden",
+  "Codice non corretto" to "Ungültiger Code",
+  "Modifica cliente" to "Kunde bearbeiten",
+  "Elimina cliente" to "Kunde löschen",
+  "Elimina promemoria" to "Erinnerung löschen",
+  "Vai a" to "Route",
+  "Appuntamento" to "Termin",
+  "Senza zona" to "Ohne Gebiet",
+  "da definire" to "offen",
+  "Nessuna" to "Keine",
+  "SÌ" to "JA",
+  "NO" to "NEIN"
+ )
+ private fun tr(it:String):String = if(prefs.getString("language", "it") == "de") additionalGerman[it] ?: translations[it] ?: it else it
  private fun isGerman() = prefs.getString("language", "it") == "de"
  private var unlocked=false
  private var lockedSinceAuth=false
@@ -46,15 +154,15 @@ class MainActivity: Activity() {
   if (isActivated()) { authenticate(); return }
   if (activationDialogShowing || isFinishing) return
   activationDialogShowing=true
-  val field=EditText(this).apply { hint="Codice di attivazione";setSingleLine(true);inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD;setPadding(dp(16),dp(12),dp(16),dp(12)) }
+  val field=EditText(this).apply { hint=tr("Codice di attivazione");setSingleLine(true);inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD;setPadding(dp(16),dp(12),dp(16),dp(12)) }
   val box=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL;setPadding(dp(16),dp(8),dp(16),0);addView(field) }
-  val dialog=AlertDialog.Builder(this).setTitle("Attiva YellowKunde").setMessage("Inserisci il codice condiviso per attivare l’app offline.").setView(box).setPositiveButton("Attiva",null).setNegativeButton("Esci"){_,_->finish()}.setCancelable(false).create()
+  val dialog=AlertDialog.Builder(this).setTitle(tr("Attiva YellowKunde")).setMessage(tr("Inserisci il codice condiviso per attivare l’app offline.")).setView(box).setPositiveButton(tr("Attiva"),null).setNegativeButton(tr("Esci")){_,_->finish()}.setCancelable(false).create()
   dialog.setOnShowListener {
    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
     val digest=MessageDigest.getInstance("SHA-256").digest(field.text.toString().toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
     if (MessageDigest.isEqual(digest.toByteArray(),activationHash.toByteArray())) {
      prefs.edit().putBoolean("yellowkunde_activated",true).apply();activationDialogShowing=false;dialog.dismiss();authenticate()
-    } else field.error="Codice non corretto"
+    } else field.error=tr("Codice non corretto")
    }
   }
   dialog.show()
@@ -227,9 +335,9 @@ class MainActivity: Activity() {
   root.setPadding(dp(14),dp(12),dp(14),dp(24))
   val header=homeCard(Color.rgb(255,212,63))
   header.addView(homeText("YellowKunde",27f,true,Color.BLACK))
-  header.addView(homeText("Gestione clienti",15f,false,Color.rgb(85,70,30)))
+  header.addView(homeText(tr("Gestione clienti"),15f,false,Color.rgb(85,70,30)))
   root.addView(header,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=dp(15)})
-  root.addView(homeText("Riepilogo attività",18f,true))
+  root.addView(homeText(tr("Riepilogo attività"),18f,true))
   val now=LocalDate.now()
   val tasks=db.tasks().filter { it.type=="visita" || it.type=="contatto" || it.type=="giro" }
   val rows=listOf(listOf("▣","Visite oggi","visita","today"),listOf("▣","Visite future","visita","future"),listOf("🔔","Promemoria oggi","contatto","today"),listOf("🔔","Promemoria futuri","contatto","future"))
@@ -245,14 +353,14 @@ class MainActivity: Activity() {
      if(type=="visita") {
       addView(android.widget.ImageView(this@MainActivity).apply {
        setImageResource(R.drawable.ic_action_calendar)
-       contentDescription="Visite"
+       contentDescription=tr("Visite")
        scaleType=android.widget.ImageView.ScaleType.FIT_CENTER
       },LinearLayout.LayoutParams(dp(25),dp(25)).apply {gravity=android.view.Gravity.CENTER_HORIZONTAL})
      } else {
-      addView(android.widget.ImageView(this@MainActivity).apply {setImageResource(R.drawable.ic_home_reminder);contentDescription="Promemoria";scaleType=android.widget.ImageView.ScaleType.FIT_CENTER},LinearLayout.LayoutParams(dp(25),dp(25)).apply {gravity=android.view.Gravity.CENTER_HORIZONTAL})
+      addView(android.widget.ImageView(this@MainActivity).apply {setImageResource(R.drawable.ic_home_reminder);contentDescription=tr("Promemoria");scaleType=android.widget.ImageView.ScaleType.FIT_CENTER},LinearLayout.LayoutParams(dp(25),dp(25)).apply {gravity=android.view.Gravity.CENTER_HORIZONTAL})
      }
      addView(homeText("${matching.size}",27f,true).apply{gravity=android.view.Gravity.CENTER})
-     addView(homeText(info[1],14f,true).apply{gravity=android.view.Gravity.CENTER})
+     addView(homeText(tr(info[1]),14f,true).apply{gravity=android.view.Gravity.CENTER})
      if(overdue>0)addView(homeText("⚠ $overdue scadute",12f,true,Color.rgb(180,40,30)).apply{gravity=android.view.Gravity.CENTER})
      setOnClickListener { showTasks(type,period) }
     }
@@ -261,43 +369,43 @@ class MainActivity: Activity() {
    root.addView(tiles,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(9);bottomMargin=dp(5)})
   }
   val day=homeCard(Color.rgb(230,246,237))
-  day.addView(homeText("⌁   Pianifica giornata     ›",19f,true,Color.rgb(0,93,67)))
-  day.addView(homeText("      Organizza il giro clienti senza orari",13f,false,Color.DKGRAY))
+  day.addView(homeText(tr("⌁   Pianifica giornata     ›"),19f,true,Color.rgb(0,93,67)))
+  day.addView(homeText(tr("      Organizza il giro clienti senza orari"),13f,false,Color.DKGRAY))
   day.setOnClickListener{showDay()}
   root.addView(day,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(18)})
-  root.addView(homeText("Clienti",22f,true))
+  root.addView(homeText(tr("Clienti"),22f,true))
   val clients=homeCard(Color.WHITE).apply {background=shape(Color.WHITE,Color.rgb(225,225,225))}
   val clientsTitle=LinearLayout(this).apply {orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL}
   clientsTitle.addView(android.widget.ImageView(this).apply {
-   setImageResource(R.drawable.ic_nav_clients);contentDescription="Clienti"
+   setImageResource(R.drawable.ic_nav_clients);contentDescription=tr("Clienti")
   },LinearLayout.LayoutParams(dp(24),dp(24)).apply {marginEnd=dp(12)})
-  clientsTitle.addView(homeText("Elenco clienti",18f,true),LinearLayout.LayoutParams(0,-2,1f))
+  clientsTitle.addView(homeText(tr("Elenco clienti"),18f,true),LinearLayout.LayoutParams(0,-2,1f))
   clientsTitle.addView(homeText("›",22f,true))
   clients.addView(clientsTitle)
-  clients.addView(homeText("      Cerca, aggiungi e gestisci i tuoi clienti",13f,false,Color.DKGRAY))
+  clients.addView(homeText(tr("      Cerca, aggiungi e gestisci i tuoi clienti"),13f,false,Color.DKGRAY))
   clients.setOnClickListener{showList("")}
   root.addView(clients,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(12)})
   val newsletterTile=homeCard(Color.WHITE).apply {background=shape(Color.WHITE,Color.rgb(225,225,225))}
   newsletterTile.addView(homeText("✉  Newsletter     ›",18f,true))
-  newsletterTile.addView(homeText("      Prepara un messaggio per i contatti abilitati",13f,false,Color.DKGRAY))
+  newsletterTile.addView(homeText(tr("      Prepara un messaggio per i contatti abilitati"),13f,false,Color.DKGRAY))
   newsletterTile.setOnClickListener {showNewsletter()}
   root.addView(newsletterTile,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(10)})
  }
  private fun showNewsletter() {
   screen("Newsletter")
-  root.addView(secondaryButton("← Home"){showHome()})
+  root.addView(secondaryButton(tr("← Home")){showHome()})
   heading("Newsletter")
   val customers=db.allCustomers()
   val zones=customers.map { it["zona"].orEmpty().trim() }.distinct().sortedWith(String.CASE_INSENSITIVE_ORDER)
   val sectors=customers.map { it["settore"].orEmpty().trim() }.distinct().sortedWith(String.CASE_INSENSITIVE_ORDER)
   val selectedZones=mutableSetOf<String>()
   val selectedSectors=mutableSetOf<String>()
-  val zoneButton=secondaryButton("Zone: tutte") {}
-  val sectorButton=secondaryButton("Settori: tutti") {}
+  val zoneButton=secondaryButton(tr("Zone: tutte")) {}
+  val sectorButton=secondaryButton(tr("Settori: tutti")) {}
   val countLabel=homeText("",16f,true)
-  val subject=EditText(this).apply {hint="Oggetto";setSingleLine(true);inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES}
+  val subject=EditText(this).apply {hint=tr("Oggetto");setSingleLine(true);inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES}
   val message=EditText(this).apply {
-   hint="Testo newsletter"
+   hint=tr("Testo newsletter")
    inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
    setSingleLine(false);minLines=6;maxLines=12
    gravity=android.view.Gravity.TOP or android.view.Gravity.START
@@ -314,18 +422,18 @@ class MainActivity: Activity() {
    return emails.filter { android.util.Patterns.EMAIL_ADDRESS.matcher(it).matches() }.distinctBy { it.lowercase(Locale.ROOT) }
   }
   fun refreshCount() {
-   zoneButton.text="Zone: "+(if(selectedZones.isEmpty())"tutte" else "${selectedZones.size} selezionate")
-   sectorButton.text="Settori: "+(if(selectedSectors.isEmpty())"tutti" else "${selectedSectors.size} selezionati")
-   countLabel.text="Destinatari abilitati: ${recipients().size}"
+   zoneButton.text=tr("Zone: ")+(if(selectedZones.isEmpty())"tutte" else "${selectedZones.size} selezionate")
+   sectorButton.text=tr("Settori: ")+(if(selectedSectors.isEmpty())"tutti" else "${selectedSectors.size} selezionati")
+   countLabel.text=(if(isGerman())"Freigegebene Empfänger: " else "Destinatari abilitati: ")+recipients().size
   }
   fun selectMultiple(title:String,choices:List<String>,selected:MutableSet<String>,onDone:()->Unit) {
    val labels=choices.map { if(it.isBlank()) "Senza ${title.lowercase(Locale.ROOT)}" else it }.toTypedArray()
    val checked=BooleanArray(choices.size) { choices[it] in selected }
    AlertDialog.Builder(this).setTitle(title+" (nessuna selezione = tutti)")
     .setMultiChoiceItems(labels,checked){_,which,isChecked->checked[which]=isChecked}
-    .setNegativeButton("Annulla",null)
-    .setNeutralButton("Tutti"){_,_->selected.clear();onDone()}
-    .setPositiveButton("Applica"){_,_->
+    .setNegativeButton(tr("Annulla"),null)
+    .setNeutralButton(tr("Tutti")){_,_->selected.clear();onDone()}
+    .setPositiveButton(tr("Applica")){_,_->
      selected.clear();choices.forEachIndexed { index,value ->if(checked[index])selected.add(value) }
      onDone()
     }.show()
@@ -335,17 +443,17 @@ class MainActivity: Activity() {
   root.addView(zoneButton,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(12)})
   root.addView(sectorButton,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(8)})
   root.addView(countLabel,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(12);bottomMargin=dp(8)})
-  root.addView(homeText("Oggetto",15f,true))
+  root.addView(homeText(tr("Oggetto"),15f,true))
   root.addView(subject,LinearLayout.LayoutParams(-1,dp(54)))
-  root.addView(homeText("Messaggio",15f,true).apply {setPadding(0,dp(10),0,0)})
+  root.addView(homeText(tr("Messaggio"),15f,true).apply {setPadding(0,dp(10),0,0)})
   root.addView(message,LinearLayout.LayoutParams(-1,dp(180)))
-  root.addView(primaryButton("Apri in Gmail o Outlook") {
+  root.addView(primaryButton(tr("Apri in Gmail o Outlook")) {
    val addresses=recipients()
    val title=subject.text.toString().trim()
    val body=message.text.toString()
    when {
-    addresses.isEmpty()->Toast.makeText(this,"Nessun indirizzo email abilitato nei filtri selezionati",Toast.LENGTH_LONG).show()
-    title.isBlank() || body.isBlank()->Toast.makeText(this,"Inserisci oggetto e messaggio",Toast.LENGTH_LONG).show()
+    addresses.isEmpty()->Toast.makeText(this,tr("Nessun indirizzo email abilitato nei filtri selezionati"),Toast.LENGTH_LONG).show()
+    title.isBlank() || body.isBlank()->Toast.makeText(this,tr("Inserisci oggetto e messaggio"),Toast.LENGTH_LONG).show()
     else -> {
      val intent=Intent(Intent.ACTION_SENDTO,Uri.parse("mailto:")).apply {
       putExtra(Intent.EXTRA_BCC,addresses.toTypedArray())
@@ -353,7 +461,7 @@ class MainActivity: Activity() {
       putExtra(Intent.EXTRA_TEXT,body)
      }
      try {startActivity(Intent.createChooser(intent,"Invia newsletter con"))}
-     catch(e:android.content.ActivityNotFoundException){Toast.makeText(this,"Installa o configura Gmail o Outlook per inviare la newsletter",Toast.LENGTH_LONG).show()}
+     catch(e:android.content.ActivityNotFoundException){Toast.makeText(this,tr("Installa o configura Gmail o Outlook per inviare la newsletter"),Toast.LENGTH_LONG).show()}
     }
    }
   }.apply {minHeight=dp(54)},LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(14)})
@@ -396,7 +504,7 @@ class MainActivity: Activity() {
 shell.addView(bottomNav)
    setContentView(shell)
   } else setContentView(scroll)
-  if(title!="YellowKunde" && title!="Home") root.addView(homeCard(Color.rgb(255,212,63)).apply { addView(homeText(title,24f,true,Color.BLACK)) })
+  if(title!="YellowKunde" && title!="Home") root.addView(homeCard(Color.rgb(255,212,63)).apply { addView(homeText(if(currentPage=="detail") title else tr(title),24f,true,Color.BLACK)) })
   return root
  }
  private val selectedZones=mutableSetOf<String>()
@@ -415,7 +523,7 @@ shell.addView(bottomNav)
   header.addView(TextView(this).apply { text="YellowKunde";textSize=23f;setSingleLine(true);ellipsize=android.text.TextUtils.TruncateAt.END;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;layoutParams=LinearLayout.LayoutParams(0,dp(44),1f);gravity=android.view.Gravity.CENTER_VERTICAL })
   header.addView(homeIconAction(R.drawable.ic_home_add,"Nuovo cliente") { saveListPosition(scroll);edit(null) })
   root.addView(header)
-  heading("Elenco clienti")
+  heading(tr("Elenco clienti"))
   searchBar=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
   val searchRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
   val search=EditText(this).apply{hint=tr("Cerca codice, nome, città, settore, zona");setSingleLine(true);setText(q);textSize=14f;setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_home_search,0,0,0);compoundDrawablePadding=dp(7)}
@@ -436,20 +544,20 @@ shell.addView(bottomNav)
      .setItems(arrayOf("SÌ","NO")){_,which->
       selectedInfoField=field;selectedInfoValue=which==0;listScrollY=0;showList()
      }
-     .setNeutralButton("Rimuovi filtro"){_,_->selectedInfoField=null;listScrollY=0;showList()}
-     .setNegativeButton("Annulla",null).show()
+     .setNeutralButton(tr("Rimuovi filtro")){_,_->selectedInfoField=null;listScrollY=0;showList()}
+     .setNegativeButton(tr("Annulla"),null).show()
    })
   }
   val infoContainer=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
   val toggleFilters:()->Unit={
-   AlertDialog.Builder(this).setTitle("Filtri clienti")
+   AlertDialog.Builder(this).setTitle(tr("Filtri clienti"))
     .setItems(arrayOf("Filtra per zona","Filtra per Info personalizzate","Azzera tutti i filtri")){_,which->
      when(which) {
       0 -> zoneAction.performClick()
       1 -> {listInfoVisible=true;infoContainer.visibility=android.view.View.VISIBLE}
       2 -> {listSearch="";selectedZones.clear();selectedInfoField=null;listScrollY=0;showList("")}
      }
-    }.setNegativeButton("Annulla",null).show()
+    }.setNegativeButton(tr("Annulla"),null).show()
   }
   filterButtons.removeAllViews()
   val firstRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
@@ -568,7 +676,7 @@ shell.addView(bottomNav)
  private fun editTask(code:String,type:String) {
   val current=db.tasks(type).firstOrNull{it.code==code}
   val note=EditText(this).apply {
-   hint="Note"
+   hint=tr("Note")
    inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
    setSingleLine(false)
    minLines=4
@@ -578,15 +686,15 @@ shell.addView(bottomNav)
   }
   var date=current?.date
   val wrapper=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(20),dp(8),dp(20),0)}
-  val dateButton=Button(this).apply{text="Data: "+(date?.let{formatDate(it)}?:"da definire")}
-  dateButton.setOnClickListener {pickDate(date?.let{LocalDate.parse(it)}?:LocalDate.now()){chosen->date=chosen.toString();dateButton.text="Data: "+formatDate(date!!)}}
+  val dateButton=Button(this).apply{text=tr("Data: ")+(date?.let{formatDate(it)}?:"da definire")}
+  dateButton.setOnClickListener {pickDate(date?.let{LocalDate.parse(it)}?:LocalDate.now()){chosen->date=chosen.toString();dateButton.text=tr("Data: ")+formatDate(date!!)}}
   wrapper.addView(dateButton)
-  wrapper.addView(secondaryButton("Rimuovi data"){date=null;dateButton.text="Data: da definire"})
+  wrapper.addView(secondaryButton(tr("Rimuovi data")){date=null;dateButton.text=tr("Data: da definire")})
   wrapper.addView(note)
   AlertDialog.Builder(this).setTitle(if(type=="visita")"Pianifica visita" else "Promemoria").setView(wrapper)
-   .setNegativeButton("Annulla",null)
-   .setNeutralButton("Calendario"){_,_->saveTaskAndCalendar(code,type,date,note.text.toString())}
-   .setPositiveButton("Salva"){_,_->try { db.saveTask(code,type,date,note.text.toString());detail(code) } catch(e:Exception){Toast.makeText(this,e.message,Toast.LENGTH_LONG).show();detail(code)} }.show()
+   .setNegativeButton(tr("Annulla"),null)
+   .setNeutralButton(tr("Calendario")){_,_->saveTaskAndCalendar(code,type,date,note.text.toString())}
+   .setPositiveButton(tr("Salva")){_,_->try { db.saveTask(code,type,date,note.text.toString());detail(code) } catch(e:Exception){Toast.makeText(this,e.message,Toast.LENGTH_LONG).show();detail(code)} }.show()
  }
  private fun saveTaskAndCalendar(code:String,type:String,date:String?,note:String){
   try { db.saveTask(code,type,date,note) }
@@ -606,15 +714,15 @@ shell.addView(bottomNav)
  private fun confirmCompletion(task:Database.Task,after:()->Unit) {
   val isVisit=task.type=="visita" || task.type=="giro"
   AlertDialog.Builder(this)
-   .setTitle("Conferma completamento")
+   .setTitle(tr("Conferma completamento"))
    .setMessage(if(isVisit)"Confermi che la visita a ${task.name} è stata effettuata? Verrà registrata nello storico visite." else "Confermi che il contatto con ${task.name} è stato effettuato?")
-   .setNegativeButton("Annulla",null)
-   .setPositiveButton("Conferma"){_,_->db.completeTask(task.id);after()}
+   .setNegativeButton(tr("Annulla"),null)
+   .setPositiveButton(tr("Conferma")){_,_->db.completeTask(task.id);after()}
    .show()
  }
  private fun showTasks(type:String,period:String?=null){
   screen("Attività")
-  root.addView(secondaryButton("← Home"){showHome()})
+  root.addView(secondaryButton(tr("← Home")){showHome()})
   heading(if(type=="visita")"Visite" else "Promemoria")
   val today=LocalDate.now().toString()
   val activityList=if(type=="visita") db.tasks().filter { it.type=="visita" || it.type=="giro" } else db.tasks(type)
@@ -628,17 +736,17 @@ shell.addView(bottomNav)
     actions.addView(b,LinearLayout.LayoutParams(0,dp(48),1f).apply { marginEnd=dp(5) })
    }
    action(if(type=="visita")"✓ Conferma visita" else "✓ Completato",true) {
-    if(type=="visita") AlertDialog.Builder(this).setTitle("Conferma visita")
+    if(type=="visita") AlertDialog.Builder(this).setTitle(tr("Conferma visita"))
      .setMessage("Confermi che la visita a ${task.name} è stata effettuata?")
-     .setNegativeButton("Torna indietro",null)
-     .setPositiveButton("Conferma"){_,_->db.completeDayVisit(task.id,task.date ?: today);showTasks(type,period)}.show()
+     .setNegativeButton(tr("Torna indietro"),null)
+     .setPositiveButton(tr("Conferma")){_,_->db.completeDayVisit(task.id,task.date ?: today);showTasks(type,period)}.show()
     else confirmCompletion(task){showTasks(type,period)}
    }
    if(type=="visita") action("× Annulla visita",false) {
-    AlertDialog.Builder(this).setTitle("Annullare questa visita?")
-     .setMessage("La visita programmata verrà eliminata definitivamente.")
-     .setNegativeButton("Torna indietro",null)
-     .setPositiveButton("Elimina visita"){_,_->db.cancelDayVisit(task.id,task.date ?: today);showTasks(type,period)}.show()
+    AlertDialog.Builder(this).setTitle(tr("Annullare questa visita?"))
+     .setMessage(tr("La visita programmata verrà eliminata definitivamente."))
+     .setNegativeButton(tr("Torna indietro"),null)
+     .setPositiveButton(tr("Elimina visita")){_,_->db.cancelDayVisit(task.id,task.date ?: today);showTasks(type,period)}.show()
    }
    root.addView(actions)
   }
@@ -646,18 +754,18 @@ shell.addView(bottomNav)
  private fun showDay(day:LocalDate=selectedDay){
   selectedDay=day;screen("Pianifica giornata")
   val dayToolbar=LinearLayout(this).apply {orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL}
-  dayToolbar.addView(button("← Home"){showHome()}.apply {
+  dayToolbar.addView(button(tr("← Home")){showHome()}.apply {
    minHeight=dp(40);minimumHeight=dp(40);textSize=14f;setPadding(dp(8),0,dp(8),0)
   },LinearLayout.LayoutParams(dp(105),dp(42)).apply {marginEnd=dp(8)})
-  dayToolbar.addView(secondaryButton("Data: "+formatDate(day.toString())){pickDate(day){showDay(it)}}.apply {
+  dayToolbar.addView(secondaryButton(tr("Data: ")+formatDate(day.toString())){pickDate(day){showDay(it)}}.apply {
    minHeight=dp(40);minimumHeight=dp(40);textSize=14f;setPadding(dp(8),0,dp(8),0)
   },LinearLayout.LayoutParams(0,dp(42),1f))
   root.addView(dayToolbar,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(14);bottomMargin=dp(12)})
-  root.addView(primaryButton("+ Aggiungi cliente"){
+  root.addView(primaryButton(tr("+ Aggiungi cliente")){
    val allClients=db.allCustomers()
    val zones=db.zones().filter { it.isNotBlank() }
    val zoneLabels=(zones+listOf("Senza zona")).toTypedArray()
-   AlertDialog.Builder(this).setTitle("Seleziona zona")
+   AlertDialog.Builder(this).setTitle(tr("Seleziona zona"))
     .setItems(zoneLabels){_,zoneIndex->
      val zone=if(zoneIndex==zones.size) "" else zones[zoneIndex]
      val clients=allClients.filter { it["zona"].orEmpty().trim()==zone }
@@ -666,10 +774,10 @@ shell.addView(bottomNav)
      } else {
       val selected=BooleanArray(clients.size)
       val names=clients.map { it["nome"].orEmpty()+" · "+it["codice"].orEmpty() }.toTypedArray()
-      AlertDialog.Builder(this).setTitle("Clienti · "+zoneLabels[zoneIndex])
+      AlertDialog.Builder(this).setTitle(tr("Clienti · ")+zoneLabels[zoneIndex])
        .setMultiChoiceItems(names,selected){_,index,checked->selected[index]=checked}
-       .setNegativeButton("Annulla",null)
-       .setPositiveButton("Aggiungi selezionati"){_,_->
+       .setNegativeButton(tr("Annulla"),null)
+       .setPositiveButton(tr("Aggiungi selezionati")){_,_->
         var added=0
         val skipped=mutableListOf<String>()
         clients.forEachIndexed { index,customer ->
@@ -684,21 +792,21 @@ shell.addView(bottomNav)
         }
         showDay(day)
         if(skipped.isNotEmpty()) AlertDialog.Builder(this)
-         .setTitle("Aggiunti: "+added+" · Non aggiunti: "+skipped.size)
+         .setTitle(tr("Aggiunti: ")+added+" · Non aggiunti: "+skipped.size)
          .setMessage(skipped.joinToString("\n"))
          .setPositiveButton("OK",null).show()
         else if(added>0) Toast.makeText(this,"Aggiunti "+added+" clienti",Toast.LENGTH_SHORT).show()
        }.show()
      }
-    }.setNegativeButton("Annulla",null).show()
+    }.setNegativeButton(tr("Annulla"),null).show()
   })
   val manual=db.tasks("giro",day.toString())
   val scheduled=db.tasks("visita").filter { it.date!=null && it.date<=day.toString() }
   // A customer present in both lists must only appear once.
   val scheduledCodes=scheduled.map { it.code }.toSet()
   val items=(scheduled+manual.filter { it.code !in scheduledCodes }).filter { !db.hasVisit(it.code,day.toString()) }.sortedWith(compareBy<Database.Task> { if(it.position>0)it.position else Int.MAX_VALUE }.thenBy { it.date })
-  heading("Visite da effettuare · "+items.size)
-  if(items.isEmpty())root.addView(homeCard(paleYellow).apply { addView(homeText("Nessuna visita da effettuare per questa data")) })
+  heading(tr("Visite da effettuare · ")+items.size)
+  if(items.isEmpty())root.addView(homeCard(paleYellow).apply { addView(homeText(tr("Nessuna visita da effettuare per questa data"))) })
   items.forEachIndexed{index,task->
    val overdue=task.date!=null && task.date<day.toString() && task.type=="visita"
    val label=if(task.type=="visita") (if(overdue)"⚠ Visita scaduta · " else "Visita programmata · ") +formatDate(task.date.orEmpty()) else ""
@@ -712,12 +820,12 @@ shell.addView(bottomNav)
     },LinearLayout.LayoutParams(0,dp(44),1f).apply { marginEnd=dp(4) })
    }
    small("✓","Conferma visita",Color.rgb(229,244,233),Color.rgb(38,115,69)) {
-    AlertDialog.Builder(this).setTitle("Conferma visita").setMessage("Confermi che la visita a ${task.name} è stata effettuata?")
-     .setNegativeButton("Indietro",null).setPositiveButton("Conferma"){_,_->db.completeDayVisit(task.id,day.toString());showDay(day)}.show()
+    AlertDialog.Builder(this).setTitle(tr("Conferma visita")).setMessage("Confermi che la visita a ${task.name} è stata effettuata?")
+     .setNegativeButton(tr("Indietro"),null).setPositiveButton(tr("Conferma")){_,_->db.completeDayVisit(task.id,day.toString());showDay(day)}.show()
    }
    small("×","Annulla visita",Color.rgb(251,232,232),Color.rgb(180,60,60)) {
-    AlertDialog.Builder(this).setTitle("Annulla visita").setMessage("La visita programmata verrà eliminata definitivamente, senza registrarla nello storico.")
-     .setNegativeButton("Indietro",null).setPositiveButton("Elimina visita"){_,_->db.cancelDayVisit(task.id,day.toString());showDay(day)}.show()
+    AlertDialog.Builder(this).setTitle(tr("Annulla visita")).setMessage(tr("La visita programmata verrà eliminata definitivamente, senza registrarla nello storico."))
+     .setNegativeButton(tr("Indietro"),null).setPositiveButton(tr("Elimina visita")){_,_->db.cancelDayVisit(task.id,day.toString());showDay(day)}.show()
    }
    small("↑","Sposta su",Color.rgb(255,241,184),Color.rgb(115,88,0),index>0) {
     val order=items.map { it.code }.toMutableList();java.util.Collections.swap(order,index,index-1);db.reorderDayClients(day.toString(),order);showDay(day)
@@ -727,12 +835,12 @@ shell.addView(bottomNav)
    }
    small("✎","Note",Color.rgb(233,239,251),Color.rgb(49,92,154)) {
     val input=EditText(this).apply{setText(task.notes)}
-    AlertDialog.Builder(this).setTitle("Note visita").setView(input).setNegativeButton("Annulla",null)
-     .setPositiveButton("Salva"){_,_->db.changeTaskNote(task.id,input.text.toString());showDay(day)}.show()
+    AlertDialog.Builder(this).setTitle(tr("Note visita")).setView(input).setNegativeButton(tr("Annulla"),null)
+     .setPositiveButton(tr("Salva")){_,_->db.changeTaskNote(task.id,input.text.toString());showDay(day)}.show()
    }
    root.addView(row)
   }
-  root.addView(secondaryButton("▦+  Aggiungi giro al calendario"){
+  root.addView(secondaryButton(tr("▦+  Aggiungi giro al calendario")){
    val start=day.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
    val description=items.mapIndexed{index,task->"${index+1}. ${task.name}: ${task.notes}"}.joinToString("\n")
    openExternal(Intent(Intent.ACTION_INSERT).setData(CalendarContract.Events.CONTENT_URI)
@@ -816,7 +924,7 @@ shell.addView(bottomNav)
   })
 
   optionsHeading(android.R.drawable.ic_menu_manage,"Personalizza campi Info")
-  addOption(secondaryButton("✎  Modifica etichette Info1–Info5"){showInfoSettings()})
+  addOption(secondaryButton(tr("✎  Modifica etichette Info1–Info5")){showInfoSettings()})
   optionsHeading(android.R.drawable.ic_lock_lock,tr("Sicurezza"))
   addOption(secondaryButton("▣  "+tr("Sicurezza")){showSecurity()})
   optionsHeading(android.R.drawable.ic_menu_compass,tr("Lingua"))
@@ -836,21 +944,21 @@ shell.addView(bottomNav)
       val label=input.text.toString().trim()
       if(label.isBlank()) { Toast.makeText(this,"L'etichetta non può essere vuota",Toast.LENGTH_LONG).show();return@setPositiveButton }
       if(label==infoLabel(key)) {showInfoSettings();return@setPositiveButton}
-      AlertDialog.Builder(this).setTitle("Etichetta modificata")
+      AlertDialog.Builder(this).setTitle(tr("Etichetta modificata"))
        .setMessage("Vuoi impostare il campo '$label' su Falso per tutti i clienti?")
-       .setNegativeButton("Mantieni valori"){_,_->prefs.edit().putString("label_$key",label).apply();showInfoSettings()}
-       .setPositiveButton("Imposta tutti su Falso"){_,_->
-        AlertDialog.Builder(this).setTitle("Confermi l'azzeramento?")
+       .setNegativeButton(tr("Mantieni valori")){_,_->prefs.edit().putString("label_$key",label).apply();showInfoSettings()}
+       .setPositiveButton(tr("Imposta tutti su Falso")){_,_->
+        AlertDialog.Builder(this).setTitle(tr("Confermi l'azzeramento?"))
          .setMessage("Il campo '$label' sarà Falso per tutti i clienti. L'operazione non è annullabile automaticamente.")
          .setNegativeButton(tr("Annulla"),null)
-         .setPositiveButton("Conferma"){_,_->db.setInfoFalseForAll(key);prefs.edit().putString("label_$key",label).apply();showInfoSettings()}.show()
+         .setPositiveButton(tr("Conferma")){_,_->db.setInfoFalseForAll(key);prefs.edit().putString("label_$key",label).apply();showInfoSettings()}.show()
        }.show()
      }.show()
    })
   }
-  root.addView(secondaryButton("Ripristina nomi predefiniti") {
-   AlertDialog.Builder(this).setMessage("Ripristinare i nomi Info1–Info5 senza modificare i valori dei clienti?")
-    .setNegativeButton(tr("Annulla"),null).setPositiveButton("Ripristina"){_,_->val editor=prefs.edit();infoKeys.forEach{editor.remove("label_$it")};editor.apply();showInfoSettings()}.show()
+  root.addView(secondaryButton(tr("Ripristina nomi predefiniti")) {
+   AlertDialog.Builder(this).setMessage(tr("Ripristinare i nomi Info1–Info5 senza modificare i valori dei clienti?"))
+    .setNegativeButton(tr("Annulla"),null).setPositiveButton(tr("Ripristina")){_,_->val editor=prefs.edit();infoKeys.forEach{editor.remove("label_$it")};editor.apply();showInfoSettings()}.show()
   })
  }
  private fun showSecurity() {
@@ -1173,7 +1281,7 @@ shell.addView(bottomNav)
   val newsletterCard=detailCard("✉  Newsletter")
   listOf("newsletter1" to "Newsletter 1 · Email principale","newsletter2" to "Newsletter 2 · Email secondaria").forEach { (key,label) ->
    newsletterCard.addView(CheckBox(this).apply {
-    text=label;textSize=16f
+    text=tr(label);textSize=16f
     isChecked=customer[key].equals("true",true) || customer[key]=="1"
     setOnCheckedChangeListener { check,checked ->
      check.isEnabled=false
@@ -1203,8 +1311,8 @@ shell.addView(bottomNav)
   })
   root.addView(actionRow)
   actionRow.addView(iconButton("↗","Condividi cliente") {
-   AlertDialog.Builder(this).setTitle("Condividi cliente")
-    .setItems(arrayOf("Testo","vCard (.vcf)")) { _,choice ->
+   AlertDialog.Builder(this).setTitle(tr("Condividi cliente"))
+    .setItems(arrayOf(tr("Testo"),"vCard (.vcf)")) { _,choice ->
      if(choice==0) {
       val parts=mutableListOf(customer["nome"].orEmpty(),destination)
       listOf("contatto_principale","telefono_principale","email_principale","contatto_secondario","telefono_secondario","email_secondaria").forEach { key ->
@@ -1244,7 +1352,7 @@ shell.addView(bottomNav)
        Toast.makeText(this,"Impossibile condividere vCard: "+(e.message ?: "errore"),Toast.LENGTH_LONG).show()
       }
      }
-    }.setNegativeButton("Annulla",null).show()
+    }.setNegativeButton(tr("Annulla"),null).show()
   })
   actionRow.addView(iconButton("▦","Appuntamento") {
    val subject="Appuntamento – "+customer["nome"].orEmpty()
@@ -1304,31 +1412,31 @@ shell.addView(bottomNav)
   visitActions.addView(visitRow1)
   visitActions.addView(visitRow2)
   root.addView(visitActions)
-  heading("Promemoria cliente")
+  heading(tr("Promemoria cliente"))
   val reminderRow=LinearLayout(this).apply {orientation=LinearLayout.HORIZONTAL}
-  reminderRow.addView(primaryButton("Pianifica visita"){editTask(code,"visita")}.apply {background=shape(Color.rgb(51,207,91));textSize=14f},LinearLayout.LayoutParams(0,dp(52),1f).apply {marginEnd=dp(5)})
-  reminderRow.addView(primaryButton("Promemoria"){editTask(code,"contatto")}.apply {background=shape(Color.rgb(49,139,250));setTextColor(Color.WHITE);textSize=14f},LinearLayout.LayoutParams(0,dp(52),1f))
+  reminderRow.addView(primaryButton(tr("Pianifica visita")){editTask(code,"visita")}.apply {background=shape(Color.rgb(51,207,91));textSize=14f},LinearLayout.LayoutParams(0,dp(52),1f).apply {marginEnd=dp(5)})
+  reminderRow.addView(primaryButton(tr("Promemoria")){editTask(code,"contatto")}.apply {background=shape(Color.rgb(49,139,250));setTextColor(Color.WHITE);textSize=14f},LinearLayout.LayoutParams(0,dp(52),1f))
   root.addView(reminderRow)
   val clientReminders=db.tasks("contatto").filter { it.code==code }
   if(clientReminders.isEmpty()) {
-   root.addView(homeText("Nessun promemoria attivo",14f,false,Color.DKGRAY))
+   root.addView(homeText(tr("Nessun promemoria attivo"),14f,false,Color.DKGRAY))
   } else {
    clientReminders.forEach { reminder ->
     val dateLabel=reminder.date?.let { formatDate(it) } ?: "Senza data"
     val noteLabel=reminder.notes.ifBlank { "Nessuna nota" }
     val reminderLine=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
-    reminderLine.addView(secondaryButton("Promemoria · "+dateLabel+"\n"+noteLabel) { editTask(code,"contatto") }.apply {
+    reminderLine.addView(secondaryButton(tr("Promemoria · ")+dateLabel+"\n"+noteLabel) { editTask(code,"contatto") }.apply {
      gravity=android.view.Gravity.CENTER_VERTICAL or android.view.Gravity.START
      textSize=14f
      setPadding(dp(14),dp(10),dp(14),dp(10))
     },LinearLayout.LayoutParams(0,-2,1f).apply {marginEnd=dp(6)})
     reminderLine.addView(secondaryButton("×") {
-     AlertDialog.Builder(this).setTitle("Eliminare promemoria?")
-      .setMessage("Vuoi eliminare questo promemoria del cliente? L'operazione non può essere annullata.")
-      .setNegativeButton("Annulla",null)
-      .setPositiveButton("Elimina"){_,_->db.removeTask(reminder.id);detail(code)}
+     AlertDialog.Builder(this).setTitle(tr("Eliminare promemoria?"))
+      .setMessage(tr("Vuoi eliminare questo promemoria del cliente? L'operazione non può essere annullata."))
+      .setNegativeButton(tr("Annulla"),null)
+      .setPositiveButton(tr("Elimina")){_,_->db.removeTask(reminder.id);detail(code)}
       .show()
-    }.apply {contentDescription="Elimina promemoria";textSize=20f;setTextColor(Color.rgb(180,40,30));minHeight=dp(48);minimumHeight=dp(48)},
+    }.apply {contentDescription=tr("Elimina promemoria");textSize=20f;setTextColor(Color.rgb(180,40,30));minHeight=dp(48);minimumHeight=dp(48)},
      LinearLayout.LayoutParams(dp(52),dp(52)))
     root.addView(reminderLine,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(8)})
    }

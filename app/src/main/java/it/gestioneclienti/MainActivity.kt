@@ -30,6 +30,26 @@ import java.security.MessageDigest
 class MainActivity: Activity() {
  private val prefs by lazy { getSharedPreferences("gestione_clienti_options", Context.MODE_PRIVATE) }
  private val additionalGerman = mapOf(
+  "Sblocca YellowKunde" to "YellowKunde entsperren",
+  "Attività già presente per questa data" to "Aktivität für dieses Datum bereits vorhanden",
+  "Seleziona una data per il calendario" to "Datum für den Kalender auswählen",
+  "⚠ SCADUTA · " to "⚠ ÜBERFÄLLIG · ",
+  "✓ Conferma visita" to "✓ Besuch bestätigen",
+  "✓ Completato" to "✓ Erledigt",
+  "× Annulla visita" to "× Besuch absagen",
+  "Nessun cliente in questa zona" to "Keine Kunden in diesem Gebiet",
+  "già presente" to "bereits vorhanden",
+  " · Non aggiunti: " to " · Nicht hinzugefügt: ",
+  "L'etichetta non può essere vuota" to "Die Bezeichnung darf nicht leer sein",
+  "Sviluppato da:" to "Entwickelt von:",
+  "Impossibile condividere vCard: " to "vCard konnte nicht geteilt werden: ",
+  "Note attività completate:" to "Notizen zu erledigten Aktivitäten:",
+  "Modifiche non salvate" to "Ungespeicherte Änderungen",
+  "Vuoi uscire senza salvare le modifiche?" to "Möchten Sie die Änderungen verwerfen?",
+  "Esci senza salvare" to "Ohne Speichern verlassen",
+  "Sei nella Home" to "Sie sind auf der Startseite",
+  "Sposta su" to "Nach oben verschieben",
+  "Sposta giù" to "Nach unten verschieben",
   "Home" to "Startseite",
   "Pianifica" to "Planung",
   "Filtri" to "Filter",
@@ -537,7 +557,7 @@ shell.addView(bottomNav)
   val zoneOptions=db.zones().filter { it.isNotBlank() }
   val noZoneFilter="__YELLOWKUNDE_NO_ZONE__"
   val zoneChoices=zoneOptions+noZoneFilter
-  val zoneLabels=zoneOptions+listOf("Senza zona")
+  val zoneLabels=zoneOptions+listOf(tr("Senza zona"))
   val zoneAction=homeIconAction(R.drawable.ic_home_zone,"Zona") {}
   fun updateZoneLabel() { zoneAction.contentDescription=tr("Zona")+": "+(if(selectedZones.isEmpty()) tr("Tutte le zone") else selectedZones.joinToString(", ") { if(it==noZoneFilter) "Senza zona" else it }) }
   updateZoneLabel()
@@ -547,7 +567,7 @@ shell.addView(bottomNav)
    val field="info$number"
    Pair(infoLabel(field),{
     AlertDialog.Builder(this).setTitle(infoLabel(field))
-     .setItems(arrayOf("SÌ","NO")){_,which->
+     .setItems(arrayOf(tr("SÌ"),tr("NO"))){_,which->
       selectedInfoField=field;selectedInfoValue=which==0;listScrollY=0;showList()
      }
      .setNeutralButton(tr("Rimuovi filtro")){_,_->selectedInfoField=null;listScrollY=0;showList()}
@@ -698,7 +718,7 @@ shell.addView(bottomNav)
   }
   var date=current?.date
   val wrapper=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(20),dp(8),dp(20),0)}
-  val dateButton=Button(this).apply{text=tr("Data: ")+(date?.let{formatDate(it)}?:"da definire")}
+  val dateButton=Button(this).apply{text=tr("Data: ")+(date?.let{formatDate(it)}?:tr("da definire"))}
   dateButton.setOnClickListener {pickDate(date?.let{LocalDate.parse(it)}?:LocalDate.now()){chosen->date=chosen.toString();dateButton.text=tr("Data: ")+formatDate(date!!)}}
   wrapper.addView(dateButton)
   wrapper.addView(secondaryButton(tr("Rimuovi data")){date=null;dateButton.text=tr("Data: da definire")})
@@ -710,9 +730,9 @@ shell.addView(bottomNav)
  }
  private fun saveTaskAndCalendar(code:String,type:String,date:String?,note:String){
   try { db.saveTask(code,type,date,note) }
-  catch(e:Exception) { Toast.makeText(this,e.message ?: "Attività già presente per questa data",Toast.LENGTH_LONG).show();return }
+  catch(e:Exception) { Toast.makeText(this,e.message?.let{tr(it)} ?: tr("Attività già presente per questa data"),Toast.LENGTH_LONG).show();return }
   val customer=db.get(code)
-  if(date==null){Toast.makeText(this,"Seleziona una data per il calendario",Toast.LENGTH_LONG).show();detail(code);return}
+  if(date==null){Toast.makeText(this,tr("Seleziona una data per il calendario"),Toast.LENGTH_LONG).show();detail(code);return}
   val day=LocalDate.parse(date)
   val start=day.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
   val intent=Intent(Intent.ACTION_INSERT).setData(CalendarContract.Events.CONTENT_URI)
@@ -727,7 +747,7 @@ shell.addView(bottomNav)
   val isVisit=task.type=="visita" || task.type=="giro"
   AlertDialog.Builder(this)
    .setTitle(tr("Conferma completamento"))
-   .setMessage(if(isVisit)"Confermi che la visita a ${task.name} è stata effettuata? Verrà registrata nello storico visite." else "Confermi che il contatto con ${task.name} è stato effettuato?")
+   .setMessage(if(isGerman()) (if(isVisit) "Bestätigen, dass der Besuch bei ${task.name} stattgefunden hat? Er wird im Besuchsverlauf gespeichert." else "Bestätigen, dass der Kontakt mit ${task.name} stattgefunden hat?") else (if(isVisit)"Confermi che la visita a ${task.name} è stata effettuata? Verrà registrata nello storico visite." else "Confermi che il contatto con ${task.name} è stato effettuato?"))
    .setNegativeButton(tr("Annulla"),null)
    .setPositiveButton(tr("Conferma")){_,_->db.completeTask(task.id);after()}
    .show()
@@ -735,26 +755,26 @@ shell.addView(bottomNav)
  private fun showTasks(type:String,period:String?=null){
   screen("Attività")
   root.addView(secondaryButton(tr("← Home")){showHome()})
-  heading(if(type=="visita")"Visite" else "Promemoria")
+  heading(tr(if(type=="visita")"Visite" else "Promemoria"))
   val today=LocalDate.now().toString()
   val activityList=if(type=="visita") db.tasks().filter { it.type=="visita" || it.type=="giro" } else db.tasks(type)
   activityList.filter {task-> when(period){"today"->(task.date!=null && task.date<=today) || (type=="contatto" && task.date==null);"future"->task.date!=null && task.date>today;else->true} }.distinctBy { it.code to it.date }.forEach {task->
    val overdue=task.date!=null && task.date<today
-   val prefix=if(overdue)"⚠ SCADUTA · " else ""
-   root.addView(secondaryButton(prefix+task.name+" · "+(task.date?.let{formatDate(it)}?:"Senza data")+"\n"+task.notes){detail(task.code)})
+   val prefix=if(overdue)tr("⚠ SCADUTA · ") else ""
+   root.addView(secondaryButton(prefix+task.name+" · "+(task.date?.let{formatDate(it)}?:tr("Senza data"))+"\n"+task.notes){detail(task.code)})
    val actions=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
    fun action(label:String,primary:Boolean,run:()->Unit) {
     val b=if(primary) primaryButton(label,run) else secondaryButton(label,run)
     actions.addView(b,LinearLayout.LayoutParams(0,dp(48),1f).apply { marginEnd=dp(5) })
    }
-   action(if(type=="visita")"✓ Conferma visita" else "✓ Completato",true) {
+   action(tr(if(type=="visita")"✓ Conferma visita" else "✓ Completato"),true) {
     if(type=="visita") AlertDialog.Builder(this).setTitle(tr("Conferma visita"))
      .setMessage(if(isGerman())"Bestätigen, dass der Besuch bei ${task.name} stattgefunden hat?" else "Confermi che la visita a ${task.name} è stata effettuata?")
      .setNegativeButton(tr("Torna indietro"),null)
      .setPositiveButton(tr("Conferma")){_,_->db.completeDayVisit(task.id,task.date ?: today);showTasks(type,period)}.show()
     else confirmCompletion(task){showTasks(type,period)}
    }
-   if(type=="visita") action("× Annulla visita",false) {
+   if(type=="visita") action(tr("× Annulla visita"),false) {
     AlertDialog.Builder(this).setTitle(tr("Annullare questa visita?"))
      .setMessage(tr("La visita programmata verrà eliminata definitivamente."))
      .setNegativeButton(tr("Torna indietro"),null)
@@ -776,13 +796,13 @@ shell.addView(bottomNav)
   root.addView(primaryButton(tr("+ Aggiungi cliente")){
    val allClients=db.allCustomers()
    val zones=db.zones().filter { it.isNotBlank() }
-   val zoneLabels=(zones+listOf("Senza zona")).toTypedArray()
+   val zoneLabels=(zones+listOf(tr("Senza zona"))).toTypedArray()
    AlertDialog.Builder(this).setTitle(tr("Seleziona zona"))
     .setItems(zoneLabels){_,zoneIndex->
      val zone=if(zoneIndex==zones.size) "" else zones[zoneIndex]
      val clients=allClients.filter { it["zona"].orEmpty().trim()==zone }
      if(clients.isEmpty()) {
-      Toast.makeText(this,"Nessun cliente in questa zona",Toast.LENGTH_SHORT).show()
+      Toast.makeText(this,tr("Nessun cliente in questa zona"),Toast.LENGTH_SHORT).show()
      } else {
       val selected=BooleanArray(clients.size)
       val names=clients.map { it["nome"].orEmpty()+" · "+it["codice"].orEmpty() }.toTypedArray()
@@ -804,10 +824,10 @@ shell.addView(bottomNav)
         }
         showDay(day)
         if(skipped.isNotEmpty()) AlertDialog.Builder(this)
-         .setTitle(tr("Aggiunti: ")+added+" · Non aggiunti: "+skipped.size)
+         .setTitle(tr("Aggiunti: ")+added+tr(" · Non aggiunti: ")+skipped.size)
          .setMessage(skipped.joinToString("\n"))
          .setPositiveButton("OK",null).show()
-        else if(added>0) Toast.makeText(this,"Aggiunti "+added+" clienti",Toast.LENGTH_SHORT).show()
+        else if(added>0) Toast.makeText(this,if(isGerman()) "$added Kunden hinzugefügt" else "Aggiunti $added clienti",Toast.LENGTH_SHORT).show()
        }.show()
      }
     }.setNegativeButton(tr("Annulla"),null).show()
@@ -832,7 +852,7 @@ shell.addView(bottomNav)
     },LinearLayout.LayoutParams(0,dp(44),1f).apply { marginEnd=dp(4) })
    }
    small("✓","Conferma visita",Color.rgb(229,244,233),Color.rgb(38,115,69)) {
-    AlertDialog.Builder(this).setTitle(tr("Conferma visita")).setMessage("Confermi che la visita a ${task.name} è stata effettuata?")
+    AlertDialog.Builder(this).setTitle(tr("Conferma visita")).setMessage(if(isGerman()) "Bestätigen, dass der Besuch bei ${task.name} stattgefunden hat?" else "Confermi che la visita a ${task.name} è stata effettuata?")
      .setNegativeButton(tr("Indietro"),null).setPositiveButton(tr("Conferma")){_,_->db.completeDayVisit(task.id,day.toString());showDay(day)}.show()
    }
    small("×","Annulla visita",Color.rgb(251,232,232),Color.rgb(180,60,60)) {
@@ -945,7 +965,7 @@ shell.addView(bottomNav)
   addOption(secondaryButton("ⓘ  "+tr("Informazioni sull’app")){showAbout()})
  }
  private fun showInfoSettings() {
-  screen("Personalizza campi Info")
+  screen(tr("Personalizza campi Info"))
   root.addView(button("← " + tr("Indietro")){showOptions()})
   infoKeys.forEach { key ->
    root.addView(button("${key.uppercase()}: ${infoLabel(key)}") {
@@ -954,14 +974,14 @@ shell.addView(bottomNav)
      .setNegativeButton(tr("Annulla"),null)
      .setPositiveButton(tr("Salva")){_,_->
       val label=input.text.toString().trim()
-      if(label.isBlank()) { Toast.makeText(this,"L'etichetta non può essere vuota",Toast.LENGTH_LONG).show();return@setPositiveButton }
+      if(label.isBlank()) { Toast.makeText(this,tr("L'etichetta non può essere vuota"),Toast.LENGTH_LONG).show();return@setPositiveButton }
       if(label==infoLabel(key)) {showInfoSettings();return@setPositiveButton}
       AlertDialog.Builder(this).setTitle(tr("Etichetta modificata"))
-       .setMessage("Vuoi impostare il campo '$label' su Falso per tutti i clienti?")
+       .setMessage(if(isGerman()) "Möchten Sie das Feld '$label' für alle Kunden auf Nein setzen?" else "Vuoi impostare il campo '$label' su Falso per tutti i clienti?")
        .setNegativeButton(tr("Mantieni valori")){_,_->prefs.edit().putString("label_$key",label).apply();showInfoSettings()}
        .setPositiveButton(tr("Imposta tutti su Falso")){_,_->
         AlertDialog.Builder(this).setTitle(tr("Confermi l'azzeramento?"))
-         .setMessage("Il campo '$label' sarà Falso per tutti i clienti. L'operazione non è annullabile automaticamente.")
+         .setMessage(if(isGerman()) "Das Feld '$label' wird für alle Kunden auf Nein gesetzt. Dies kann nicht automatisch rückgängig gemacht werden." else "Il campo '$label' sarà Falso per tutti i clienti. L'operazione non è annullabile automaticamente.")
          .setNegativeButton(tr("Annulla"),null)
          .setPositiveButton(tr("Conferma")){_,_->db.setInfoFalseForAll(key);prefs.edit().putString("label_$key",label).apply();showInfoSettings()}.show()
        }.show()
@@ -996,7 +1016,7 @@ shell.addView(bottomNav)
   root.addView(button("← " + tr("Indietro")){showOptions()})
   val packageInfo=packageManager.getPackageInfo(packageName,0)
   root.addView(TextView(this).apply {
-   text="YellowKunde\n${tr("Versione")}: ${packageInfo.versionName}\nSviluppato da: Ivan V."
+   text="YellowKunde\n${tr("Versione")}: ${packageInfo.versionName}\n${tr("Sviluppato da:")} Ivan V."
    textSize=18f
   })
  }
@@ -1359,9 +1379,9 @@ shell.addView(bottomNav)
         clipData=android.content.ClipData.newUri(contentResolver,"Contatto vCard",uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
        }
-       startActivity(Intent.createChooser(share,"Condividi vCard"))
+       startActivity(Intent.createChooser(share,tr("Condividi vCard")))
       } catch(e:Exception) {
-       Toast.makeText(this,"Impossibile condividere vCard: "+(e.message ?: "errore"),Toast.LENGTH_LONG).show()
+       Toast.makeText(this,tr("Impossibile condividere vCard: ")+(e.message ?: "errore"),Toast.LENGTH_LONG).show()
       }
      }
     }.setNegativeButton(tr("Annulla"),null).show()
@@ -1383,12 +1403,12 @@ shell.addView(bottomNav)
   val visits=db.visitEntries(code)
   val visitHistory=visits.joinToString("\n") { "• ${it.second.format(displayDate)}" }
   detailCard(if(isGerman())"▦  Besuchsverlauf" else "▦  Storico visite").addView(TextView(this).apply {
-   text=if(isGerman()) "Besuche ${LocalDate.now().year}: $count\nLetzter Besuch: ${if(last.isNullOrBlank()) "Kein Besuch" else formatDate(last)}\n\nVerlauf:\n$visitHistory" else "Visite ${LocalDate.now().year}: $count\nUltima visita: ${formatDate(last)}\n\nStorico:\n$visitHistory"
+   text=if(isGerman()) "Besuche ${LocalDate.now().year}: $count\nLetzter Besuch: ${if(last.isBlank() || last=="Nessuna") "Kein Besuch" else formatDate(last)}\n\nVerlauf:\n$visitHistory" else "Visite ${LocalDate.now().year}: $count\nUltima visita: ${formatDate(last)}\n\nStorico:\n$visitHistory"
    textSize=16f;setPadding(dp(5),dp(10),dp(5),dp(10))
   })
   val completed=db.tasks(openOnly=false).filter { it.code==code && it.done && it.notes.isNotBlank() }
   if(completed.isNotEmpty())root.addView(TextView(this).apply {
-   text="Note attività completate:\n"+completed.joinToString("\n") { "• "+(if(it.type=="contatto")tr("Promemoria") else (if(isGerman())"Besuch" else "Visita"))+": "+it.notes }
+   text=tr("Note attività completate:")+"\n"+completed.joinToString("\n") { "• "+(if(it.type=="contatto")tr("Promemoria") else (if(isGerman())"Besuch" else "Visita"))+": "+it.notes }
    textSize=15f;setPadding(0,dp(8),0,dp(12))
   })
   val visitActions=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL}
@@ -1435,7 +1455,7 @@ shell.addView(bottomNav)
   } else {
    clientReminders.forEach { reminder ->
     val dateLabel=reminder.date?.let { formatDate(it) } ?: "Senza data"
-    val noteLabel=reminder.notes.ifBlank { "Nessuna nota" }
+    val noteLabel=reminder.notes.ifBlank { tr("Nessuna nota") }
     val reminderLine=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL }
     reminderLine.addView(secondaryButton(tr("Promemoria · ")+dateLabel+"\n"+noteLabel) { editTask(code,"contatto") }.apply {
      gravity=android.view.Gravity.CENTER_VERTICAL or android.view.Gravity.START
@@ -1473,7 +1493,7 @@ shell.addView(bottomNav)
      .setPositiveButton(tr("Esci senza salvare")){_,_->goBack()}.show()
     else goBack()
    }
-   "home" -> Toast.makeText(this,"Sei nella Home",Toast.LENGTH_SHORT).show()
+   "home" -> Toast.makeText(this,tr("Sei nella Home"),Toast.LENGTH_SHORT).show()
     else -> showHome()
   }
  }

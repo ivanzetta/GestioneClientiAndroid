@@ -361,7 +361,7 @@ class MainActivity: Activity() {
      }
      addView(homeText("${matching.size}",27f,true).apply{gravity=android.view.Gravity.CENTER})
      addView(homeText(tr(info[1]),14f,true).apply{gravity=android.view.Gravity.CENTER})
-     if(overdue>0)addView(homeText("⚠ $overdue scadute",12f,true,Color.rgb(180,40,30)).apply{gravity=android.view.Gravity.CENTER})
+     if(overdue>0)addView(homeText("⚠ $overdue "+(if(isGerman())"überfällig" else "scadute"),12f,true,Color.rgb(180,40,30)).apply{gravity=android.view.Gravity.CENTER})
      setOnClickListener { showTasks(type,period) }
     }
     tiles.addView(card,LinearLayout.LayoutParams(0,dp(108),1f).apply { marginStart=if(i==0)0 else dp(5);marginEnd=if(i==0)dp(5) else 0 })
@@ -422,14 +422,14 @@ class MainActivity: Activity() {
    return emails.filter { android.util.Patterns.EMAIL_ADDRESS.matcher(it).matches() }.distinctBy { it.lowercase(Locale.ROOT) }
   }
   fun refreshCount() {
-   zoneButton.text=tr("Zone: ")+(if(selectedZones.isEmpty())"tutte" else "${selectedZones.size} selezionate")
-   sectorButton.text=tr("Settori: ")+(if(selectedSectors.isEmpty())"tutti" else "${selectedSectors.size} selezionati")
+   zoneButton.text=tr("Zone: ")+(if(selectedZones.isEmpty())tr("tutte") else "${selectedZones.size} "+(if(isGerman())"ausgewählt" else "selezionate"))
+   sectorButton.text=tr("Settori: ")+(if(selectedSectors.isEmpty())tr("tutti") else "${selectedSectors.size} "+(if(isGerman())"ausgewählt" else "selezionati"))
    countLabel.text=(if(isGerman())"Freigegebene Empfänger: " else "Destinatari abilitati: ")+recipients().size
   }
   fun selectMultiple(title:String,choices:List<String>,selected:MutableSet<String>,onDone:()->Unit) {
-   val labels=choices.map { if(it.isBlank()) "Senza ${title.lowercase(Locale.ROOT)}" else it }.toTypedArray()
+   val labels=choices.map { if(it.isBlank()) if(isGerman()) (if(title=="Zone") "Ohne Gebiet" else "Ohne Branche") else "Senza ${title.lowercase(Locale.ROOT)}" else it }.toTypedArray()
    val checked=BooleanArray(choices.size) { choices[it] in selected }
-   AlertDialog.Builder(this).setTitle(title+" (nessuna selezione = tutti)")
+   AlertDialog.Builder(this).setTitle(tr(title)+(if(isGerman())" (keine Auswahl = alle)" else " (nessuna selezione = tutti)"))
     .setMultiChoiceItems(labels,checked){_,which,isChecked->checked[which]=isChecked}
     .setNegativeButton(tr("Annulla"),null)
     .setNeutralButton(tr("Tutti")){_,_->selected.clear();onDone()}
@@ -460,7 +460,7 @@ class MainActivity: Activity() {
       putExtra(Intent.EXTRA_SUBJECT,title)
       putExtra(Intent.EXTRA_TEXT,body)
      }
-     try {startActivity(Intent.createChooser(intent,"Invia newsletter con"))}
+     try {startActivity(Intent.createChooser(intent,tr("Invia newsletter con")))}
      catch(e:android.content.ActivityNotFoundException){Toast.makeText(this,tr("Installa o configura Gmail o Outlook per inviare la newsletter"),Toast.LENGTH_LONG).show()}
     }
    }
@@ -697,7 +697,7 @@ shell.addView(bottomNav)
   wrapper.addView(dateButton)
   wrapper.addView(secondaryButton(tr("Rimuovi data")){date=null;dateButton.text=tr("Data: da definire")})
   wrapper.addView(note)
-  AlertDialog.Builder(this).setTitle(if(type=="visita")"Pianifica visita" else "Promemoria").setView(wrapper)
+  AlertDialog.Builder(this).setTitle(tr(if(type=="visita")"Pianifica visita" else "Promemoria")).setView(wrapper)
    .setNegativeButton(tr("Annulla"),null)
    .setNeutralButton(tr("Calendario")){_,_->saveTaskAndCalendar(code,type,date,note.text.toString())}
    .setPositiveButton(tr("Salva")){_,_->try { db.saveTask(code,type,date,note.text.toString());detail(code) } catch(e:Exception){Toast.makeText(this,e.message,Toast.LENGTH_LONG).show();detail(code)} }.show()
@@ -743,7 +743,7 @@ shell.addView(bottomNav)
    }
    action(if(type=="visita")"✓ Conferma visita" else "✓ Completato",true) {
     if(type=="visita") AlertDialog.Builder(this).setTitle(tr("Conferma visita"))
-     .setMessage("Confermi che la visita a ${task.name} è stata effettuata?")
+     .setMessage(if(isGerman())"Bestätigen, dass der Besuch bei ${task.name} stattgefunden hat?" else "Confermi che la visita a ${task.name} è stata effettuata?")
      .setNegativeButton(tr("Torna indietro"),null)
      .setPositiveButton(tr("Conferma")){_,_->db.completeDayVisit(task.id,task.date ?: today);showTasks(type,period)}.show()
     else confirmCompletion(task){showTasks(type,period)}
@@ -815,7 +815,7 @@ shell.addView(bottomNav)
   if(items.isEmpty())root.addView(homeCard(paleYellow).apply { addView(homeText(tr("Nessuna visita da effettuare per questa data"))) })
   items.forEachIndexed{index,task->
    val overdue=task.date!=null && task.date<day.toString() && task.type=="visita"
-   val label=if(task.type=="visita") (if(overdue)"⚠ Visita scaduta · " else "Visita programmata · ") +formatDate(task.date.orEmpty()) else ""
+   val label=if(task.type=="visita") (if(overdue)(if(isGerman())"⚠ Überfälliger Besuch · " else "⚠ Visita scaduta · ") else (if(isGerman())"Geplanter Besuch · " else "Visita programmata · ")) +formatDate(task.date.orEmpty()) else ""
    root.addView(secondaryButton(listOf("${index+1}. ${task.name}",label,task.notes).filter { it.isNotBlank() }.joinToString("\n")){detail(task.code)})
    val row=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
    fun small(symbol:String,description:String,bg:Int,fg:Int,enabled:Boolean=true,action:()->Unit) {
@@ -944,7 +944,7 @@ shell.addView(bottomNav)
   infoKeys.forEach { key ->
    root.addView(button("${key.uppercase()}: ${infoLabel(key)}") {
     val input=EditText(this).apply { setSingleLine(true);setText(infoLabel(key)) }
-    AlertDialog.Builder(this).setTitle("Nuova etichetta per ${key.uppercase()}").setView(input)
+    AlertDialog.Builder(this).setTitle((if(isGerman())"Neue Bezeichnung für " else "Nuova etichetta per ")+key.uppercase()).setView(input)
      .setNegativeButton(tr("Annulla"),null)
      .setPositiveButton(tr("Salva")){_,_->
       val label=input.text.toString().trim()

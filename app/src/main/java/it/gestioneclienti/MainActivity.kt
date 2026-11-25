@@ -30,6 +30,12 @@ import java.security.MessageDigest
 class MainActivity: Activity() {
  private val prefs by lazy { getSharedPreferences("gestione_clienti_options", Context.MODE_PRIVATE) }
  private val additionalGerman = mapOf(
+  "Home" to "Startseite",
+  "Pianifica" to "Planung",
+  "Filtri" to "Filter",
+  "Ordina" to "Sortieren",
+  "Filtra per Info personalizzate" to "Nach benutzerdefinierten Infos filtern",
+  "Azzera tutti i filtri" to "Alle Filter zurücksetzen",
   "Gestione clienti" to "Kundenverwaltung",
   "Riepilogo attività" to "Aktivitätenübersicht",
   "Visite oggi" to "Besuche heute",
@@ -324,7 +330,7 @@ class MainActivity: Activity() {
     contentDescription=label
    }
    item.addView(android.widget.ImageView(this).apply {setImageResource(symbol);contentDescription=label;scaleType=android.widget.ImageView.ScaleType.FIT_CENTER;setColorFilter(if(active==key)Color.rgb(190,131,0) else ink)},LinearLayout.LayoutParams(dp(25),dp(25)).apply {gravity=android.view.Gravity.CENTER_HORIZONTAL})
-   item.addView(homeText(label,13f,active==key).apply {gravity=android.view.Gravity.CENTER})
+   item.addView(homeText(tr(label),13f,active==key).apply {gravity=android.view.Gravity.CENTER})
    item.setOnClickListener { when(key) { "home"->showHome(); "clients"->showList(""); "day"->showDay(); else->showOptions() } }
    nav.addView(item,LinearLayout.LayoutParams(0,dp(66),1f))
   }
@@ -551,7 +557,7 @@ shell.addView(bottomNav)
   val infoContainer=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
   val toggleFilters:()->Unit={
    AlertDialog.Builder(this).setTitle(tr("Filtri clienti"))
-    .setItems(arrayOf("Filtra per zona","Filtra per Info personalizzate","Azzera tutti i filtri")){_,which->
+    .setItems(arrayOf(tr("Filtra per zona"),tr("Filtra per Info personalizzate"),tr("Azzera tutti i filtri"))){_,which->
      when(which) {
       0 -> zoneAction.performClick()
       1 -> {listInfoVisible=true;infoContainer.visibility=android.view.View.VISIBLE}
@@ -584,7 +590,7 @@ shell.addView(bottomNav)
     contentDescription=label
     scaleType=android.widget.ImageView.ScaleType.FIT_CENTER
    },LinearLayout.LayoutParams(dp(25),dp(25)))
-   tile.addView(homeText(label,12f,true).apply {gravity=android.view.Gravity.CENTER})
+   tile.addView(homeText(tr(label),12f,true).apply {gravity=android.view.Gravity.CENTER})
    firstRow.addView(tile,LinearLayout.LayoutParams(0,dp(54),1f).apply {marginEnd=dp(4);topMargin=dp(5)})
   }
   addListIcon(R.drawable.ic_list_filter,"Filtri",toggleFilters)
@@ -878,7 +884,7 @@ shell.addView(bottomNav)
    headingRow.addView(android.widget.ImageView(this).apply {
     setImageResource(icon);setColorFilter(ink)
    },LinearLayout.LayoutParams(dp(22),dp(22)).apply {marginEnd=dp(10)})
-   headingRow.addView(homeText(title,17f,true))
+   headingRow.addView(homeText(tr(title),17f,true))
    card.addView(headingRow)
    optionContainer=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL}
    card.addView(optionContainer)
@@ -1377,12 +1383,12 @@ shell.addView(bottomNav)
   val visits=db.visitEntries(code)
   val visitHistory=visits.joinToString("\n") { "• ${it.second.format(displayDate)}" }
   detailCard(if(isGerman())"▦  Besuchsverlauf" else "▦  Storico visite").addView(TextView(this).apply {
-   text=if(isGerman()) "Besuche ${LocalDate.now().year}: $count\nLetzter Besuch: ${formatDate(last)}\n\nVerlauf:\n$visitHistory" else "Visite ${LocalDate.now().year}: $count\nUltima visita: ${formatDate(last)}\n\nStorico:\n$visitHistory"
+   text=if(isGerman()) "Besuche ${LocalDate.now().year}: $count\nLetzter Besuch: ${if(last.isNullOrBlank()) "Kein Besuch" else formatDate(last)}\n\nVerlauf:\n$visitHistory" else "Visite ${LocalDate.now().year}: $count\nUltima visita: ${formatDate(last)}\n\nStorico:\n$visitHistory"
    textSize=16f;setPadding(dp(5),dp(10),dp(5),dp(10))
   })
   val completed=db.tasks(openOnly=false).filter { it.code==code && it.done && it.notes.isNotBlank() }
   if(completed.isNotEmpty())root.addView(TextView(this).apply {
-   text="Note attività completate:\n"+completed.joinToString("\n") { "• "+(if(it.type=="contatto")"Telefonata" else "Visita")+": "+it.notes }
+   text="Note attività completate:\n"+completed.joinToString("\n") { "• "+(if(it.type=="contatto")tr("Promemoria") else (if(isGerman())"Besuch" else "Visita"))+": "+it.notes }
    textSize=15f;setPadding(0,dp(8),0,dp(12))
   })
   val visitActions=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL}
